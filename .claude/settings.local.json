@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python3 -c ' *)",
-      "Bash(node --check --input-type=module)",
-      "Bash(mkdir -p \"/private/tmp/claude-501/-Users-alex-Desktop-tycoon-wwerahause/fd899e7e-bf2e-4ccb-b1dd-615fd5e41326/scratchpad\")"
-    ]
-  }
-}
