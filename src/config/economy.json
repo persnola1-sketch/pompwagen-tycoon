@@ -1,7 +1,12 @@
 {
   "startMoney": 20000,
-  "warehouse": { "cost": 15000, "buildSeconds": 10 },
-  "interaction": { "actionCooldown": 0.45 },
+  "warehouse": {
+    "cost": 15000,
+    "buildSeconds": 10
+  },
+  "interaction": {
+    "actionCooldown": 0.45
+  },
   "supplier": {
     "firstOfferDelay": 8,
     "offerIntervalMin": 6,
@@ -22,25 +27,57 @@
     "fastDeliveryRepBonus": 0.15,
     "missedRepPenalty": 0.5
   },
-  "reputation": { "start": 3, "min": 0, "max": 5, "priceBonusPerStar": 0.03 },
+  "reputation": {
+    "start": 3,
+    "min": 0,
+    "max": 5,
+    "priceBonusPerStar": 0.03
+  },
   "stages": [
-    { "key": "pompwagen", "supplierMin": 3, "supplierMax": 6, "customerMin": 2, "customerMax": 4 },
-    { "key": "electric", "supplierMin": 6, "supplierMax": 12, "customerMin": 4, "customerMax": 8 },
-    { "key": "forklift", "supplierMin": 12, "supplierMax": 24, "customerMin": 8, "customerMax": 16 }
+    {
+      "key": "pompwagen",
+      "supplierMin": 3,
+      "supplierMax": 6,
+      "customerMin": 2,
+      "customerMax": 4
+    },
+    {
+      "key": "electric",
+      "supplierMin": 6,
+      "supplierMax": 12,
+      "customerMin": 4,
+      "customerMax": 8
+    },
+    {
+      "key": "forklift",
+      "supplierMin": 12,
+      "supplierMax": 24,
+      "customerMin": 8,
+      "customerMax": 16
+    }
   ],
   "payPads": {
     "payDuration": 1.8,
     "minPayRatePerSecond": 80,
-    "rackRowCosts": [300, 1400, 2000, 2800, 3600, 4500],
+    "rackRowCosts": [
+      300,
+      1400,
+      2000,
+      2800,
+      3600,
+      4500
+    ],
     "electricPompwagen": 1100,
-    "speedUpgrade": { "costs": [150, 1300, 2600], "speedBonusPerLevel": 0.12 }
+    "speedUpgrade": {
+      "costs": [
+        150,
+        1300,
+        2600
+      ],
+      "speedBonusPerLevel": 0.12
+    }
   },
   "tutorial": {
-    "product": "water",
-    "freeDeliveryPallets": 3,
-    "customerPallets": 2,
-    "customerPricePerPallet": 70,
-    "completionBonus": 0,
-    "doneMessageSeconds": 5
+    "product": "water"
   }
 }

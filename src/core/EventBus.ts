@@ -30,6 +30,10 @@ export type GameEvents = {
 
   tutorialStep: { id: string; text: string };
   tutorialDone: Record<string, never>;
+  guideSay: { id: string; text: string; tap: boolean; target: string | null; skippable: boolean; autoHide: number };
+  guideHide: Record<string, never>;
+  guideContinue: Record<string, never>;
+  workerHired: { workerId: number };
   toast: { text: string; kind: 'good' | 'bad' | 'info' };
   ordersChanged: Record<string, never>;
 };

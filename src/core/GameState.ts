@@ -12,8 +12,18 @@ export interface Stats {
   spent: number;
 }
 
+export interface Settings {
+  henkTips: boolean;
+  sound: boolean;
+  music: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = { henkTips: true, sound: true, music: true };
+
 export interface SaveData {
   version: number;
+  settings?: Settings;
+  tipsSeen?: string[];
   money: number;
   reputation: number;
   rackRows: number;
@@ -37,6 +47,8 @@ export class GameState {
   speedLevel = 0;
   tutorialDone = false;
   warehouseBuilt = false;
+  settings: Settings = { ...DEFAULT_SETTINGS };
+  tipsSeen: string[] = [];
   padProgress: Record<string, number> = {};
   stats: Stats = { shipped: 0, earned: 0, spent: 0 };
 
@@ -112,6 +124,8 @@ export class GameState {
       speedLevel: this.speedLevel,
       tutorialDone: this.tutorialDone,
       warehouseBuilt: this.warehouseBuilt,
+      settings: { ...this.settings },
+      tipsSeen: [...this.tipsSeen],
       padProgress: { ...this.padProgress },
       stats: { ...this.stats },
     };
@@ -127,6 +141,8 @@ export class GameState {
     this.tutorialDone = d.tutorialDone;
     // saves from before the plot intro already have a warehouse
     this.warehouseBuilt = d.warehouseBuilt ?? true;
+    this.settings = { ...DEFAULT_SETTINGS, ...(d.settings ?? {}) };
+    this.tipsSeen = d.tipsSeen ?? [];
     this.padProgress = d.padProgress ?? {};
     this.stats = d.stats ?? { shipped: 0, earned: 0, spent: 0 };
   }

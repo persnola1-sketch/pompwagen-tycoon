@@ -26,7 +26,8 @@ import { Sound } from './audio/Sound';
 import { Hud } from './ui/Hud';
 import { Popups } from './ui/Popups';
 import { OrderBoard } from './ui/OrderBoard';
-import { TutorialOverlay } from './ui/TutorialOverlay';
+import { GuideBubble } from './ui/GuideBubble';
+import { Henk } from './world/Henk';
 import { Toasts } from './ui/Toasts';
 import { Confetti } from './ui/Confetti';
 import { Interactions } from './game/Interactions';
@@ -64,7 +65,8 @@ class Game {
   private board: OrderBoard;
   private toasts: Toasts;
   private confetti = new Confetti();
-  private tutorialUi = new TutorialOverlay();
+  private guide = new GuideBubble(tutorialCfg.typeSpeed);
+  private henk: Henk;
   private dev: DevPanel;
 
   private dustTimer = 0;
@@ -90,6 +92,7 @@ class Game {
     this.player.speedBonus = this.state.speedLevel * economy.payPads.speedUpgrade.speedBonusPerLevel;
 
     this.effects = new Effects(scene);
+    this.henk = new Henk(scene);
     scene.add(this.pads.group);
 
     this.supplierTruck = new Truck('supplier', scene);
@@ -124,13 +127,9 @@ class Game {
     const built = this.state.warehouseBuilt;
     this.colliders = built ? this.warehouse.colliders : this.plot.colliders;
     this.setWarehouseVisible(built);
-    if (built) {
-      if (this.state.tutorialDone) this.orders.startAuto();
-      else this.tutorial.start();
-    } else {
-      this.player.teleport(layout.plot.playerStart.x, layout.plot.playerStart.z);
-      this.bus.emit('toast', { text: 'Welcome to your plot! Stand on the BUY WAREHOUSE pad to get started.', kind: 'info' });
-    }
+    if (!built) this.player.teleport(layout.plot.playerStart.x, layout.plot.playerStart.z);
+    if (this.state.tutorialDone) this.orders.startAuto();
+    else this.tutorial.start();
 
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.save.save();
@@ -205,7 +204,6 @@ class Game {
     this.player.character.celebrate();
     this.bus.emit('warehouseBuilt', {});
     if (this.state.tutorialDone) this.orders.startAuto();
-    else this.tutorial.start();
     this.save.save();
   }
 
@@ -285,16 +283,33 @@ class Game {
       this.save.save();
     });
     this.bus.on('orderMissed', () => this.sound.error());
-    this.bus.on('tutorialStep', ({ id, text }) => {
-      const idx = tutorialCfg.steps.findIndex((s) => s.id === id);
-      this.tutorialUi.show(idx + 1, tutorialCfg.steps.length, text);
-      this.effects.setGuide(this.guideFor(id));
+    this.guide.onTap = (): void => {
+      this.sound.click();
+      this.bus.emit('guideContinue', {});
+    };
+    this.guide.onSkip = (): void => {
+      this.sound.click();
+      this.tutorial.skip();
+    };
+    this.guide.onBlip = (): void => this.sound.blip();
+    this.bus.on('guideSay', ({ text, tap, skippable, autoHide }) => {
+      this.guide.say(text, tap, skippable, autoHide);
+      this.henk.show(true);
+      if (autoHide > 0) window.setTimeout(() => { if (!this.guide.visible) this.henk.show(false); }, autoHide * 1000 + 50);
+    });
+    this.bus.on('guideHide', () => {
+      this.guide.hide();
+      this.henk.show(false);
+      this.henk.setTarget(null);
+      this.effects.setGuide(null);
     });
     this.bus.on('tutorialDone', () => {
-      this.tutorialUi.hideAfter(economy.tutorial.doneMessageSeconds);
-      this.effects.setGuide(null);
       this.sound.fanfare();
       this.save.save();
+    });
+    this.bus.on('rackRowBuilt', () => this.tutorial.tip('firstRackRow'));
+    this.bus.on('upgradeBought', ({ upgrade }) => {
+      if (upgrade === 'electric') this.tutorial.tip('firstElectric');
     });
     this.bus.on('rackRowBuilt', () => this.sound.build());
     this.bus.on('productUnlocked', () => {
@@ -303,15 +318,21 @@ class Game {
     });
   }
 
-  private guideFor(stepId: string): THREE.Vector3 | null {
+  /** world position of the current tutorial target (null = none) */
+  private tutorialTarget(): THREE.Vector3 | null {
     const p = layout.pads;
-    switch (stepId) {
+    const rack = new THREE.Vector3(layout.rackRows.rows[0].x, 0, rowPadZ(0));
+    switch (this.tutorial.currentTarget) {
+      case 'buyPad':
+        return new THREE.Vector3(layout.plot.pad.x, 0, layout.plot.pad.z);
       case 'unload':
         return new THREE.Vector3(p.unload.x, 0, p.unload.z);
-      case 'store':
-        return new THREE.Vector3(layout.rackRows.rows[0].x, 0, rowPadZ(0));
-      case 'loadTruck':
-        return this.player.carrying > 0 ? new THREE.Vector3(p.load.x, 0, p.load.z) : new THREE.Vector3(layout.rackRows.rows[0].x, 0, rowPadZ(0));
+      case 'rack':
+        return rack;
+      case 'load':
+        return this.player.carrying > 0 ? new THREE.Vector3(p.load.x, 0, p.load.z) : rack;
+      case 'office':
+        return new THREE.Vector3(p.office.x, 0, p.office.z);
       default:
         return null;
     }
@@ -336,7 +357,7 @@ class Game {
     const camera = this.root.camera;
     this.player.update(dt, ix, iy, this.colliders);
     this.orders.update(dt);
-    this.tutorial.update(dt, this.player.speed);
+    this.tutorial.update();
     this.supplierTruck.update(dt, camera);
     this.customerTruck.update(dt, camera);
     this.racks.update(dt);
@@ -356,7 +377,11 @@ class Game {
       }
     }
 
-    if (this.tutorial.currentStepId === 'loadTruck') this.effects.setGuide(this.guideFor('loadTruck'));
+    const target = this.tutorial.active ? this.tutorialTarget() : null;
+    this.henk.setTarget(target);
+    this.effects.setGuide(target);
+    this.henk.update(dt, this.player.position, this.player.heading);
+    this.guide.update(dt);
 
     this.dustTimer -= dt;
     if (this.player.speed > 2.4 && this.dustTimer <= 0) {

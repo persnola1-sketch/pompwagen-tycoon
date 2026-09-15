@@ -119,7 +119,7 @@ export class Pads {
     const label = new THREE.Mesh(labelGeo, labelMat);
     label.position.set(0, 2.2, 0);
     label.renderOrder = 20;
-    label.visible = !opts.noLabel;
+    label.visible = !opts.noLabel && !locked;
     g.add(label);
 
     g.position.set(x, 0, z);
@@ -163,6 +163,7 @@ export class Pads {
     p.labelMat.map?.dispose();
     p.labelMat.map = padLabelTexture(p.icon, lines[0] ?? '', lines[1] ?? '', p.accent, locked);
     p.labelMat.needsUpdate = true;
+    p.label.visible = !locked;
   }
 
   setActive(id: string, active: boolean): void {

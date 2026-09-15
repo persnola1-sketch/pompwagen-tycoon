@@ -110,6 +110,10 @@ export class Sound {
     this.tone(523, 0.14, 'sine', 0.15, undefined, 0.2);
     this.tone(659, 0.25, 'sine', 0.16, undefined, 0.3);
   }
+  /** short voice blip for the guide's typewriter text */
+  blip(): void {
+    this.tone(520 + Math.random() * 260, 0.045, 'triangle', 0.07, 400);
+  }
   hammer(): void {
     this.noise(0.06, 0.25, 1800);
     this.tone(320, 0.06, 'square', 0.08, 180);

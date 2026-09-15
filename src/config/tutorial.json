@@ -1,11 +1,31 @@
 {
+  "typeSpeed": 34,
+  "firstDeliveryPallets": 3,
+  "firstDeliveryPricePerPallet": 30,
+  "customerPallets": 2,
+  "customerPricePerPallet": 70,
+  "tipSeconds": 6,
   "steps": [
-    { "id": "move",      "text": "Welcome to your first shift! Drag anywhere to drive your pompwagen." },
-    { "id": "offer",     "text": "A supplier offer! Your first delivery is FREE — accept it!" },
-    { "id": "unload",    "text": "The truck is at the dock. Stand on the UNLOAD pad to take a pallet." },
-    { "id": "store",     "text": "Drive to the rack and store the pallet. Repeat for all {pallets} pallets." },
-    { "id": "order",     "text": "A customer order! {store} needs {needed} pallets — you have {stock} ✔. Accept!" },
-    { "id": "loadTruck", "text": "Load their truck: take pallets from the rack to the LOAD pad." },
-    { "id": "done",      "text": "+€{profit} profit! Leftover stock waits for the next customer. You're the boss now — keep the trucks moving!" }
-  ]
+    { "id": "welcome",   "tap": true,  "text": "Welcome to your plot, boss! I'm Henk — 40 years on the pompwagen. Let's build you a warehouse." },
+    { "id": "buy",       "target": "buyPad", "text": "Walk onto the BUY WAREHOUSE pad and stand still. Your money flows in until it's paid." },
+    { "id": "opened",    "tap": true,  "text": "Look at that beauty! An empty warehouse earns nothing though. Let's get some stock." },
+    { "id": "offer",     "text": "A supplier is calling! Accept the delivery offer at the top of the screen." },
+    { "id": "unload",    "target": "unload", "text": "The truck is driving through the city to your dock. Stand on the UNLOAD pad to take a pallet." },
+    { "id": "store",     "target": "rack", "text": "Drive to the rack strip and store the pallet. Repeat for all {pallets} pallets." },
+    { "id": "order",     "text": "A customer order! {store} wants {needed} pallets — you have {stock} ✔. Accept it!" },
+    { "id": "loadTruck", "target": "load", "text": "Take pallets from the rack to the LOAD pad and fill their truck." },
+    { "id": "profit",    "tap": true,  "text": "+€{profit} profit! Buy low, sell high — that's the whole business, boss." },
+    { "id": "hire",      "target": "office", "text": "Running around alone gets tiring. Let's hire your first worker! Open Workers and pick a candidate (€100)." },
+    { "id": "watch",     "tap": true,  "text": "Look at them go! Check your Quests for goals and rewards. See you around, boss!" }
+  ],
+  "tips": {
+    "firstWorker": "Workers earn XP for every pallet. Level them up and they get faster!",
+    "firstRackRow": "More racks means more products in stock. Customers love a full warehouse.",
+    "firstConstruction": "Building takes a moment. Keep working — or finish it now with a boost.",
+    "firstElectric": "The electric pompwagen carries 2 pallets. Half the trips!",
+    "firstForklift": "The forklift reaches the upper rack levels. Vertical storage, boss!",
+    "firstConveyor": "Drop pallets on the conveyor and let the belt do the walking.",
+    "firstQuest": "Quests pay out money and company XP. Claim them in the Quests menu.",
+    "firstEvent": "Special events pay extra. Jump on them while they last!"
+  }
 }
