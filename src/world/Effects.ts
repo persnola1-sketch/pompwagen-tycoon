@@ -39,6 +39,7 @@ export class Effects {
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
     this.arrow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x38d15e }));
     this.arrow.rotation.x = Math.PI / 2;
+    this.arrow.scale.setScalar(1.8);
     this.arrow.visible = false;
     this.group.add(this.arrow);
   }
@@ -94,7 +95,7 @@ export class Effects {
     if (this.arrowTarget) {
       this.arrow.position.set(
         this.arrowTarget.x,
-        1.6 + Math.sin(this.time * 4) * 0.25,
+        2.6 + Math.sin(this.time * 4) * 0.35,
         this.arrowTarget.z,
       );
     }

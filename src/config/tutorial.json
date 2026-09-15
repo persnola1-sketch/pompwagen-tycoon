@@ -3,11 +3,9 @@
     { "id": "move",      "text": "Welcome to your first shift! Drag anywhere to drive your pompwagen." },
     { "id": "offer",     "text": "A supplier offer! Your first delivery is FREE — accept it!" },
     { "id": "unload",    "text": "The truck is at the dock. Stand on the UNLOAD pad to take a pallet." },
-    { "id": "store",     "text": "Drive to the rack and store the pallet. Repeat for all 3 pallets." },
-    { "id": "order",     "text": "A customer order! FreshMart needs 2 pallets — you have 3 ✔. Accept!" },
+    { "id": "store",     "text": "Drive to the rack and store the pallet. Repeat for all {pallets} pallets." },
+    { "id": "order",     "text": "A customer order! {store} needs {needed} pallets — you have {stock} ✔. Accept!" },
     { "id": "loadTruck", "text": "Load their truck: take pallets from the rack to the LOAD pad." },
-    { "id": "profit",    "text": "+€28 profit! The leftover pallet stays in stock for the next customer." },
-    { "id": "expand",    "text": "Now expand: stand on the NEW RACK ROW pad until it's paid." },
-    { "id": "done",      "text": "You're the boss now. Keep the trucks moving!" }
+    { "id": "done",      "text": "+€{profit} profit! Leftover stock waits for the next customer. You're the boss now — keep the trucks moving!" }
   ]
 }

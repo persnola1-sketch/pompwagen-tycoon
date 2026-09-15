@@ -1,51 +1,60 @@
 import economy from '../config/economy.json';
 import layout from '../config/layout.json';
 import { EventBus } from './EventBus';
+import { PRODUCTS, ProductDef, unlockedProducts } from './Products';
+
+export const SAVE_VERSION = 2;
+export const TOTAL_SLOTS = layout.rackRows.rows.length * layout.rackRows.slotsPerRow;
+
+export interface Stats {
+  shipped: number;
+  earned: number;
+  spent: number;
+}
 
 export interface SaveData {
   version: number;
   money: number;
   reputation: number;
   rackRows: number;
-  /** slot occupancy per global slot index */
-  slots: boolean[];
+  /** product id per global slot index, null = empty */
+  slots: (string | null)[];
   electric: boolean;
   speedLevel: number;
-  secondDock: boolean;
   tutorialDone: boolean;
   padProgress: Record<string, number>;
-  stats: { shipped: number; earned: number; spent: number };
+  stats: Stats;
 }
 
 export class GameState {
-  money: number;
-  reputation: number;
-  rackRows: number;
-  slots: boolean[];
+  money: number = economy.startMoney;
+  reputation: number = economy.reputation.start;
+  rackRows: number = layout.rackRows.startRows;
+  slots: (string | null)[] = new Array(TOTAL_SLOTS).fill(null);
   electric = false;
   speedLevel = 0;
-  secondDock = false;
   tutorialDone = false;
   padProgress: Record<string, number> = {};
-  stats = { shipped: 0, earned: 0, spent: 0 };
-  /** pallets currently on the forks */
-  carrying = 0;
+  stats: Stats = { shipped: 0, earned: 0, spent: 0 };
 
-  constructor(private bus: EventBus) {
-    this.money = economy.startMoney;
-    this.reputation = economy.reputation.start;
-    this.rackRows = layout.rackRows.startRows;
-    this.slots = new Array(layout.rackRows.maxRows * layout.rackRows.slotsPerRow).fill(false);
-  }
+  constructor(private bus: EventBus) {}
 
   get capacity(): number {
     return this.rackRows * layout.rackRows.slotsPerRow;
   }
 
-  get stock(): number {
+  /** pallets in built racks, optionally of one product */
+  stockOf(productId?: string): number {
     let n = 0;
-    for (let i = 0; i < this.capacity; i++) if (this.slots[i]) n++;
+    for (let i = 0; i < this.capacity; i++) {
+      const s = this.slots[i];
+      if (s && (!productId || s === productId)) n++;
+    }
     return n;
+  }
+
+  get stock(): number {
+    return this.stockOf();
   }
 
   get freeSpace(): number {
@@ -54,6 +63,10 @@ export class GameState {
 
   get stageIndex(): number {
     return this.electric ? 1 : 0;
+  }
+
+  get unlocked(): ProductDef[] {
+    return unlockedProducts(this.stats.shipped);
   }
 
   addMoney(delta: number): void {
@@ -69,27 +82,31 @@ export class GameState {
     this.bus.emit('reputationChanged', { rep: this.reputation });
   }
 
-  /** find first free slot in built rows, or -1 */
-  firstFreeSlot(): number {
-    for (let i = 0; i < this.capacity; i++) if (!this.slots[i]) return i;
-    return -1;
+  /** count shipped pallets and announce products that just unlocked */
+  addShipped(n: number): void {
+    const before = this.stats.shipped;
+    this.stats.shipped += n;
+    for (const p of PRODUCTS) {
+      if (p.unlockShipped > before && p.unlockShipped <= this.stats.shipped) {
+        this.bus.emit('productUnlocked', { product: p.id });
+      }
+    }
   }
 
-  setSlot(index: number, occupied: boolean): void {
-    this.slots[index] = occupied;
+  setSlot(index: number, productId: string | null): void {
+    this.slots[index] = productId;
     this.bus.emit('stockChanged', { stock: this.stock, capacity: this.capacity });
   }
 
   toSave(): SaveData {
     return {
-      version: 1,
+      version: SAVE_VERSION,
       money: this.money,
       reputation: this.reputation,
       rackRows: this.rackRows,
       slots: [...this.slots],
       electric: this.electric,
       speedLevel: this.speedLevel,
-      secondDock: this.secondDock,
       tutorialDone: this.tutorialDone,
       padProgress: { ...this.padProgress },
       stats: { ...this.stats },
@@ -99,11 +116,10 @@ export class GameState {
   loadFrom(d: SaveData): void {
     this.money = d.money;
     this.reputation = d.reputation;
-    this.rackRows = d.rackRows;
-    for (let i = 0; i < this.slots.length; i++) this.slots[i] = !!d.slots[i];
+    this.rackRows = Math.max(layout.rackRows.startRows, Math.min(layout.rackRows.rows.length, d.rackRows));
+    for (let i = 0; i < this.slots.length; i++) this.slots[i] = d.slots[i] ?? null;
     this.electric = d.electric;
-    this.speedLevel = d.speedLevel;
-    this.secondDock = d.secondDock;
+    this.speedLevel = Math.min(d.speedLevel, economy.payPads.speedUpgrade.costs.length);
     this.tutorialDone = d.tutorialDone;
     this.padProgress = d.padProgress ?? {};
     this.stats = d.stats ?? { shipped: 0, earned: 0, spent: 0 };

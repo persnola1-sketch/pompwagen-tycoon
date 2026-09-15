@@ -130,6 +130,8 @@ Rules: player can't fail, first truck and order are free and instant, skip butto
 
 ## 6. Economy (starter numbers, tune during playtests)
 
+> Superseded: the live economy is documented in `docs/economy.md`. Its numbers are in `src/config/` and checked with `npm run sim`. The table below is the original starting point.
+
 | Item | Start value | Upgrade effect | Cost formula |
 |---|---|---|---|
 | Pallet payout | €5 per shipped pallet | – | – |

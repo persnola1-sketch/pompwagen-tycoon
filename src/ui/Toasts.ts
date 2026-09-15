@@ -1,4 +1,7 @@
 import { EventBus } from '../core/EventBus';
+import { product } from '../core/Products';
+
+export type ToastKind = 'good' | 'bad' | 'info' | 'unlock';
 
 /** Toast messages, floating money numbers, and the big profit splash. */
 export class Toasts {
@@ -15,24 +18,17 @@ export class Toasts {
       this.profitSplash(`+€${revenue}`, `profit €${profit}${fast ? ' · fast delivery ★' : ''}`);
     });
     bus.on('orderMissed', () => this.show('Order missed! Reputation down', 'bad'));
+    bus.on('productUnlocked', ({ product: id }) => {
+      this.show(`New product unlocked: ${product(id).name}! Customers will start ordering it.`, 'unlock');
+    });
   }
 
-  show(text: string, kind: 'good' | 'bad' | 'info'): void {
+  show(text: string, kind: ToastKind): void {
     const el = document.createElement('div');
     el.className = `toast ${kind}`;
     el.textContent = text;
     this.container.appendChild(el);
-    setTimeout(() => el.remove(), 2800);
-  }
-
-  floater(text: string, xFrac = 0.5, yFrac = 0.45): void {
-    const el = document.createElement('div');
-    el.className = 'floater';
-    el.textContent = text;
-    el.style.left = `${xFrac * 100}%`;
-    el.style.top = `${yFrac * 100}%`;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 1500);
+    setTimeout(() => el.remove(), kind === 'unlock' ? 4200 : 2800);
   }
 
   profitSplash(big: string, small: string): void {

@@ -51,9 +51,11 @@ The manual pompwagen carries 1 pallet, so unloading 50 pallets is 50 trips. Earl
 
 ## 5. Products
 
-- **MVP:** 1 product, water bottles (blue shrink-wrapped pallets)
-- **Soon after:** 2–3 products with different looks and margins (e.g. soft drinks, chips, toilet paper)
-- Different products need their own rack slots, which makes space a real decision
+- **Now:** 6 products in `src/config/products.json`, each with its own pallet look (wrap colour, box style), buy price, sell price and demand
+- You start with water bottles and soft drinks. Chips, toilet paper, canned food and cleaning products unlock as you ship more pallets.
+- Customers order one product or a mixed load of two
+- Every pallet takes its own rack slot, and slot tags on the beams show which product sits where, so space is a real decision
+- Pricing and pacing math: `docs/economy.md`
 
 Use fictional supplier and store names, not real brands.
 
@@ -122,9 +124,11 @@ Photorealistic graphics aren't realistic for phones in a browser, or for a two-p
 4. "Store the pallet in the rack" (repeat for 3 small pallets, arrows guide)
 5. Customer order pops up: "FreshMart needs 2 pallets. You have 3 ✔. Accept!"
 6. "Load their truck at the outbound dock"
-7. Truck leaves, "+€28 profit!"
-8. "1 pallet is still in stock for the next customer. Now expand: stand on the NEW RACK ROW pad"
-9. "You're the boss now. Keep the trucks moving!"
+7. Truck leaves: "+€X profit! Leftover stock waits for the next customer. You're the boss now — keep the trucks moving!"
+
+The tutorial ends right after that first profitable sale. Storage expansion is
+not part of it. The warehouse starts compact, and unlock pads for future rack
+rows sit on the empty floor for players to discover.
 
 ## 11. Build order
 
@@ -147,4 +151,4 @@ Rebuild as a proper multi-file project (Vite + TypeScript + Three.js, as in the 
 - **Buying stock:** you pay suppliers upfront (default) vs pay after selling
 - **Missed deadlines:** reputation drop (default) vs money fine
 - **Offers:** random arrivals (default) vs choosing from an order board
-- **Camera:** angled top-down follow (default), first-person later
+- **Camera:** high angled top-down follow that shows most of the warehouse, pinch/wheel zoom with limits, overview button for the whole yard (numbers in `src/config/camera.json`); first-person later

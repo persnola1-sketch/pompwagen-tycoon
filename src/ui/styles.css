@@ -1,6 +1,8 @@
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --panel: rgba(24, 30, 42, 0.92);
   --panel-border: rgba(255, 255, 255, 0.12);
   --accent: #ffb020;
@@ -13,50 +15,59 @@
 /* ---------- HUD ---------- */
 #hud {
   top: calc(var(--safe-top) + 8px);
-  left: 10px; right: 10px;
-  display: flex; gap: 8px; align-items: flex-start;
+  left: calc(var(--safe-left) + 10px); right: calc(var(--safe-right) + 10px);
+  display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap;
   pointer-events: none;
 }
 .chip {
   background: var(--panel); border: 1px solid var(--panel-border);
-  border-radius: 12px; padding: 7px 12px; font-weight: 700; font-size: 15px;
-  display: flex; align-items: center; gap: 6px;
+  border-radius: 12px; padding: 7px 10px; font-weight: 700; font-size: 15px;
+  display: flex; align-items: center; gap: 5px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.35);
   white-space: nowrap;
 }
-.chip small { font-weight: 600; opacity: 0.65; font-size: 11px; }
 #money-chip { color: var(--accent); }
 #money-chip.bump { animation: bump 0.3s; }
 @keyframes bump { 50% { transform: scale(1.18); } }
-#rep-chip { color: #ffd75e; font-size: 13px; }
+#rep-chip { color: #ffd75e; font-size: 12px; }
 #stock-chip { color: #7ec8ff; }
-#board-toggle {
-  margin-left: auto; pointer-events: auto;
+.hud-btns { margin-left: auto; display: flex; gap: 6px; }
+.hud-btns button {
+  pointer-events: auto;
   background: var(--panel); border: 1px solid var(--panel-border);
-  color: #e8eaf0; border-radius: 12px; padding: 7px 12px; font-weight: 700; font-size: 14px;
+  color: #e8eaf0; border-radius: 12px; padding: 7px 11px; font-weight: 700; font-size: 14px;
+  min-height: 36px;
 }
+#overview-toggle.on { background: var(--accent); color: #1b2230; }
+body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 
 /* ---------- order board ---------- */
 #order-board {
-  top: calc(var(--safe-top) + 54px); right: 10px; width: 230px;
+  top: calc(var(--safe-top) + 54px); right: calc(var(--safe-right) + 10px); width: 240px;
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 140px); overflow-y: auto;
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 14px; padding: 10px; font-size: 13px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.4);
   display: none;
 }
 #order-board.open { display: block; }
-#order-board h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; margin-bottom: 6px; }
-.board-item { padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.08); line-height: 1.35; }
+#order-board h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; margin: 4px 0 6px; }
+.board-item { padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.08); line-height: 1.45; }
 .board-item:first-of-type { border-top: none; }
 .board-item .t { font-variant-numeric: tabular-nums; opacity: 0.75; }
-.board-item .warn { color: var(--bad); }
+.board-item .warn { color: var(--bad); opacity: 1; }
 .board-empty { opacity: 0.5; padding: 6px 0; }
+.stock-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+.stock-row b { font-variant-numeric: tabular-nums; }
+.muted { opacity: 0.6; font-weight: 500; }
+.pchip { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.pchip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; box-shadow: 0 0 0 1px rgba(255,255,255,0.35); }
 
 /* ---------- offer cards ---------- */
 #cards {
   left: 50%; transform: translateX(-50%);
   top: calc(var(--safe-top) + 52px);
-  width: min(330px, calc(100vw - 24px));
+  width: min(340px, calc(100vw - 24px));
   display: flex; flex-direction: column; gap: 10px;
   pointer-events: none;
 }
@@ -75,13 +86,15 @@
 }
 .card .title { font-weight: 800; font-size: 15px; }
 .card .sub { font-size: 12px; opacity: 0.65; }
-.card .row { font-size: 13.5px; line-height: 1.5; }
+.card .row { font-size: 13.5px; line-height: 1.55; }
 .card .row b { font-variant-numeric: tabular-nums; }
+.card .line { display: flex; align-items: center; gap: 6px; }
+.card .line .stock { margin-left: auto; font-variant-numeric: tabular-nums; }
 .card .stock-ok { color: var(--good); font-weight: 700; }
 .card .stock-bad { color: var(--bad); font-weight: 700; }
 .card .btns { display: flex; gap: 8px; margin-top: 9px; }
 .card button {
-  flex: 1; border: none; border-radius: 11px; padding: 10px 0;
+  flex: 1; border: none; border-radius: 11px; padding: 11px 0;
   font-weight: 800; font-size: 14px; color: #fff;
 }
 .card .accept { background: #2f9e4f; }
@@ -101,18 +114,13 @@
   background: var(--panel); border: 1px solid var(--panel-border);
   padding: 8px 16px; border-radius: 20px; font-weight: 700; font-size: 14px;
   animation: toastIn 0.3s, toastOut 0.4s 2.2s forwards;
+  text-align: center;
 }
 .toast.good { color: var(--good); }
 .toast.bad { color: var(--bad); }
+.toast.unlock { color: #1b2230; background: var(--accent); animation: toastIn 0.3s, toastOut 0.4s 3.6s forwards; }
 @keyframes toastIn { from { transform: translateY(16px); opacity: 0; } }
 @keyframes toastOut { to { transform: translateY(-12px); opacity: 0; } }
-.floater {
-  position: fixed; font-weight: 800; font-size: 20px; color: var(--good);
-  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
-  pointer-events: none; z-index: 60;
-  animation: floatUp 1.4s ease-out forwards;
-}
-@keyframes floatUp { to { transform: translateY(-70px); opacity: 0; } }
 
 /* ---------- tutorial ---------- */
 #tutorial {
@@ -135,13 +143,14 @@
   animation: splashIn 0.4s cubic-bezier(0.2, 1.6, 0.4, 1), toastOut 0.5s 1.8s forwards;
 }
 #profit-splash .big { font-size: 38px; font-weight: 900; color: var(--good); text-shadow: 0 3px 10px rgba(0,0,0,0.6); }
-#profit-splash .small { font-size: 16px; font-weight: 700; opacity: 0.9; }
+#profit-splash .small { font-size: 16px; font-weight: 700; opacity: 0.9; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
 @keyframes splashIn { from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } }
 
 /* ---------- dev panel ---------- */
 #dev-panel {
   bottom: calc(var(--safe-bottom) + 8px); left: 10px;
   background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px;
-  font-size: 11px; font-family: monospace; display: flex; gap: 8px; align-items: center;
+  font-size: 11px; font-family: monospace; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  max-width: calc(100vw - 20px);
 }
 #dev-panel button { background: #333; color: #fff; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; }

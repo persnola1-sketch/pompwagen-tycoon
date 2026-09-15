@@ -1,5 +1,11 @@
 {
-  "product": { "id": "water", "name": "Water Bottles", "color": "#2e7fd6" },
-  "suppliers": ["AquaPure", "BronWater BV", "Helder Springs", "BlueDrop Co", "Vitalis Water"],
+  "suppliers": {
+    "water": ["AquaPure", "Helder Springs", "BlueDrop Co", "Vitalis Water"],
+    "soda": ["FizzCo", "Bubbel BV", "ColaNova"],
+    "chips": ["Krokant Snacks", "CrunchCo", "ChipStar"],
+    "toiletPaper": ["SoftRoll BV", "Wolk Tissue", "ComfyPlus"],
+    "cannedFood": ["Blikvers Foods", "PantryPro", "Oogst & Co"],
+    "cleaning": ["Glans & Co", "SparkleClean BV", "Frisko"]
+  },
   "stores": ["FreshMart", "SuperDeal", "Buurt Markt", "QuickShop", "MegaVoordeel", "Spar & Go"]
 }

@@ -1,0 +1,19 @@
+{
+  "fov": 45,
+  "pitchDeg": 56,
+  "followLerp": 5,
+  "zoomLerp": 7,
+  "lookAheadZ": -1.5,
+  "portraitViewWidth": 19,
+  "landscapeViewDepth": 24,
+  "minDistance": 14,
+  "maxDistance": 75,
+  "wheelSensitivity": 0.0012,
+  "far": 700,
+  "ceilingHideDistance": 24,
+  "fogNear": 70,
+  "fogFar": 190,
+  "shadowExtent": 26,
+  "overview": { "x": 0, "z": 2, "pitchDeg": 64, "viewWidthPortrait": 64, "viewDepthLandscape": 78 },
+  "adaptiveQuality": { "lowFps": 45, "sampleSeconds": 2.5, "minPixelRatio": 1.0, "step": 0.25 }
+}

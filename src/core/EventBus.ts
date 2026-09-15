@@ -14,12 +14,13 @@ export type GameEvents = {
   truckDocked: { kind: TruckKind; orderId: number };
   truckLeaving: { kind: TruckKind; orderId: number };
 
-  palletPicked: { from: 'truck' | 'rack' };
-  palletStored: { slot: number };
-  palletLoaded: { remaining: number };
+  palletPicked: { from: 'truck' | 'rack'; product: string };
+  palletStored: { slot: number; product: string };
+  palletLoaded: { remaining: number; product: string };
   deliveryComplete: { orderId: number };
   orderShipped: { orderId: number; revenue: number; profit: number; fast: boolean };
   orderMissed: { orderId: number };
+  productUnlocked: { product: string };
 
   padPayment: { padId: string; paid: number; total: number };
   padUnlocked: { padId: string };
@@ -33,10 +34,12 @@ export type GameEvents = {
 };
 
 export type TruckKind = 'supplier' | 'customer';
+export type OrderState = 'offered' | 'accepted' | 'docked' | 'done';
 
 export interface SupplierOffer {
   id: number;
   supplier: string;
+  /** product id (see config/products.json) */
   product: string;
   pallets: number;
   pricePerPallet: number;
@@ -44,21 +47,26 @@ export interface SupplierOffer {
   free: boolean;
   /** pallets still on the truck once docked */
   remaining: number;
-  state: 'offered' | 'accepted' | 'docked' | 'done';
+  state: OrderState;
+}
+
+export interface OrderLine {
+  product: string;
+  pallets: number;
+  loaded: number;
+  pricePerPallet: number;
+  costBasisPerPallet: number;
 }
 
 export interface CustomerOffer {
   id: number;
   store: string;
-  product: string;
-  pallets: number;
-  pricePerPallet: number;
-  costBasisPerPallet: number;
+  /** one line per product; mixed orders have two */
+  lines: OrderLine[];
   expiresIn: number;
   deadline: number;
   deadlineTotal: number;
-  loaded: number;
-  state: 'offered' | 'accepted' | 'docked' | 'done';
+  state: OrderState;
 }
 
 type Handler<T> = (payload: T) => void;

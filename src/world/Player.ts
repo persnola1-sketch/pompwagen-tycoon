@@ -3,14 +3,47 @@ import vehicles from '../config/vehicles.json';
 import layout from '../config/layout.json';
 import { AABB } from './Warehouse';
 import { createPallet } from './Pallet';
+import { MergeBuilder, glow, mat, unitCylinder, unitSphere } from './Merge';
 
 type VehicleCfg = typeof vehicles.pompwagen;
 
+const limbCache = new Map<string, THREE.BufferGeometry>();
+/** capsule with its centre at the origin, long axis along y */
+function limb(radius: number, length: number): THREE.BufferGeometry {
+  const key = `${radius}|${length}`;
+  let g = limbCache.get(key);
+  if (!g) {
+    g = new THREE.CapsuleGeometry(radius, length, 4, 10);
+    limbCache.set(key, g);
+  }
+  return g;
+}
+
+const HIP_Y = 0.86;
+
+// worker palette
+const SKIN = mat(0xe0ac85, 0.75);
+const SHIRT = mat(0x2c3e66, 0.85);
+const PANTS = mat(0x3b4150, 0.85);
+const VEST = mat(0xff7a1a, 0.55);
+const REFLECT = mat(0xe9edf0, 0.25, 0.4);
+const BOOT = mat(0x2b2420, 0.7);
+const SOLE = mat(0x14120f, 0.9);
+const TOE = mat(0x7b828b, 0.35, 0.7);
+const HELMET = mat(0xffc61a, 0.35, 0.05);
+const GLOVE = mat(0xc9a24a, 0.8);
+const EYE = mat(0x141414, 0.4);
+
+interface Leg {
+  hip: THREE.Group;
+  knee: THREE.Group;
+}
+
 /**
- * Character walking forward holding the pompwagen handle behind them.
- * The pompwagen is a two-link trailer: the steering head follows the hands
- * via a rigid handle, and the body pivots around the fork rollers — it swings
- * wide in turns and can never stretch or detach (section 8 of the design).
+ * Worker in hi-vis vest, hard hat and safety boots walking forward while pulling
+ * the pompwagen handle behind. The pompwagen is a two-link trailer: the steering
+ * head follows the hands via a rigid handle, and the body pivots around the fork
+ * rollers — it swings wide in turns and can never stretch or detach.
  */
 export class Player {
   readonly group = new THREE.Group();
@@ -20,25 +53,31 @@ export class Player {
   z: number;
   heading = Math.PI; // facing -z initially
   speed = 0;
-  carrying = 0;
+  speedBonus = 0;
+  /** product id of each pallet on the forks, bottom first */
+  cargo: string[] = [];
 
   private steerPos = new THREE.Vector2();
   private rollerPos = new THREE.Vector2();
   private cfg: VehicleCfg = vehicles.pompwagen;
 
-  // visuals
+  // character rig
   private character = new THREE.Group();
-  private pompwagen = new THREE.Group();
-  private handleMesh: THREE.Mesh;
-  private legL!: THREE.Mesh;
-  private legR!: THREE.Mesh;
+  private upper = new THREE.Group();
+  private legs: Leg[] = [];
+  private shoulders: THREE.Group[] = [];
   private walkT = 0;
+  private idleT = 0;
+
+  // pompwagen
+  private pompwagen = new THREE.Group();
+  private handle = new THREE.Group();
+  private handleShaft: THREE.Mesh;
   private steerHead = new THREE.Group();
-  private forkWheels: THREE.Mesh[] = [];
-  private steerWheels: THREE.Mesh[] = [];
+  private wheels: THREE.Mesh[] = [];
   private palletMounts: THREE.Group[] = [];
-  private manualParts = new THREE.Group();
   private electricParts = new THREE.Group();
+  private beacon: THREE.Mesh;
 
   constructor(parent: THREE.Object3D) {
     this.x = layout.playerStart.x;
@@ -48,23 +87,30 @@ export class Player {
 
     this.buildCharacter();
     this.buildPompwagen();
-    this.handleMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.03, 0.03, 1, 8),
-      new THREE.MeshStandardMaterial({ color: 0x3a3f48, roughness: 0.5, metalness: 0.5 }),
-    );
-    this.group.add(this.character, this.pompwagen, this.handleMesh);
+    this.handleShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 8), mat(0xd9651f, 0.45, 0.4));
+    this.handleShaft.castShadow = true;
+    const grip = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.02, 6, 14), mat(0x22252b, 0.8));
+    grip.rotation.y = Math.PI / 2;
+    this.handle.add(grip);
+    this.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), glow(0xff9a1a));
+    this.beacon.position.set(0, 0.95, 0.3);
+    this.electricParts.add(this.beacon);
+    this.group.add(this.character, this.pompwagen, this.handleShaft, this.handle);
     parent.add(this.group);
     this.setElectric(false);
   }
 
   setElectric(on: boolean): void {
     this.cfg = on ? vehicles.electric : vehicles.pompwagen;
-    this.manualParts.visible = !on;
     this.electricParts.visible = on;
   }
 
   get capacity(): number {
     return this.cfg.capacity;
+  }
+
+  get carrying(): number {
+    return this.cargo.length;
   }
 
   get position(): THREE.Vector3 {
@@ -74,117 +120,150 @@ export class Player {
   // ---------- models ----------
 
   private buildCharacter(): void {
-    const skin = new THREE.MeshStandardMaterial({ color: 0xe8b48a, roughness: 0.8 });
-    const vest = new THREE.MeshStandardMaterial({ color: 0xf07818, roughness: 0.7 });
-    const shirt = new THREE.MeshStandardMaterial({ color: 0x4a566e, roughness: 0.8 });
-    const pants = new THREE.MeshStandardMaterial({ color: 0x2e3442, roughness: 0.85 });
-
-    // legs
-    const legGeo = new THREE.BoxGeometry(0.14, 0.42, 0.16);
-    this.legL = new THREE.Mesh(legGeo, pants);
-    this.legL.position.set(-0.1, 0.21, 0);
-    this.legR = new THREE.Mesh(legGeo, pants);
-    this.legR.position.set(0.1, 0.21, 0);
-    // torso with hi-vis vest
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.26), vest);
-    torso.position.y = 0.67;
-    torso.castShadow = true;
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.07, 0.27), new THREE.MeshStandardMaterial({ color: 0xd8d8d0, roughness: 0.5 }));
-    stripe.position.y = 0.72;
-    // arms reaching back to the handle
-    const armGeo = new THREE.BoxGeometry(0.09, 0.4, 0.09);
+    // legs with hip + knee pivots
     for (const sx of [-1, 1]) {
-      const arm = new THREE.Mesh(armGeo, shirt);
-      arm.position.set(sx * 0.26, 0.68, 0.12);
-      arm.rotation.x = -0.9;
-      this.character.add(arm);
+      const hip = new THREE.Group();
+      hip.position.set(sx * 0.1, HIP_Y, 0);
+      const thigh = new THREE.Mesh(limb(0.078, 0.28), PANTS);
+      thigh.position.y = -0.21;
+      thigh.castShadow = true;
+      const knee = new THREE.Group();
+      knee.position.y = -0.42;
+      const lower = new MergeBuilder();
+      lower.add(limb(0.066, 0.26), PANTS, 0, -0.18, 0);
+      lower.box(0.13, 0.11, 0.27, BOOT, 0, -0.38, 0.05);
+      lower.box(0.14, 0.03, 0.29, SOLE, 0, -0.44, 0.05);
+      lower.box(0.135, 0.06, 0.06, TOE, 0, -0.4, 0.18);
+      knee.add(lower.build());
+      hip.add(thigh, knee);
+      this.character.add(hip);
+      this.legs.push({ hip, knee });
     }
-    // head + cap
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.22), skin);
-    head.position.y = 1.06;
-    head.castShadow = true;
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.09, 0.25), new THREE.MeshStandardMaterial({ color: 0x2563b8, roughness: 0.7 }));
-    cap.position.y = 1.2;
-    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.03, 0.12), new THREE.MeshStandardMaterial({ color: 0x2563b8, roughness: 0.7 }));
-    brim.position.set(0, 1.16, -0.17);
-    this.character.add(this.legL, this.legR, torso, stripe, head, cap, brim);
+
+    // torso, vest, head and helmet merged into one static group
+    this.upper.position.y = HIP_Y;
+    const b = new MergeBuilder();
+    b.box(0.3, 0.14, 0.19, PANTS, 0, 0.03, 0);
+    b.box(0.32, 0.05, 0.2, SOLE, 0, 0.1, 0); // belt
+    b.add(limb(0.16, 0.24), SHIRT, 0, 0.32, 0, 0, 0, 0, 1, 1, 0.72);
+    b.add(limb(0.172, 0.22), VEST, 0, 0.3, 0, 0, 0, 0, 1.02, 1, 0.8);
+    for (const y of [0.2, 0.33]) b.box(0.35, 0.035, 0.29, REFLECT, 0, y, 0);
+    for (const sx of [-1, 1]) b.box(0.035, 0.34, 0.29, REFLECT, sx * 0.08, 0.36, 0);
+    b.add(unitCylinder, SKIN, 0, 0.57, 0, 0, 0, 0, 0.1, 0.1, 0.1);
+    b.add(unitSphere, SKIN, 0, 0.71, 0, 0, 0, 0, 0.23, 0.24, 0.23);
+    for (const sx of [-1, 1]) b.add(unitSphere, EYE, sx * 0.042, 0.725, 0.105, 0, 0, 0, 0.03, 0.03, 0.02);
+    b.box(0.03, 0.04, 0.03, SKIN, 0, 0.7, 0.118);
+    b.add(new THREE.SphereGeometry(0.135, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), HELMET, 0, 0.745, 0);
+    b.add(unitCylinder, HELMET, 0, 0.75, 0.025, 0, 0, 0, 0.33, 0.02, 0.34);
+    b.box(0.035, 0.03, 0.25, HELMET, 0, 0.875, 0);
+    this.upper.add(b.build());
+
+    // arms reaching back to the handle: shoulder + elbow pivots
+    for (const sx of [-1, 1]) {
+      const shoulder = new THREE.Group();
+      shoulder.position.set(sx * 0.215, 0.49, 0);
+      shoulder.rotation.set(0.5, 0, -sx * 0.14);
+      const upperArm = new THREE.Mesh(limb(0.056, 0.2), SHIRT);
+      upperArm.position.y = -0.15;
+      upperArm.castShadow = true;
+      const elbow = new THREE.Group();
+      elbow.position.y = -0.3;
+      elbow.rotation.x = -0.25;
+      const fore = new MergeBuilder();
+      fore.add(limb(0.05, 0.18), SHIRT, 0, -0.13, 0);
+      fore.add(unitSphere, GLOVE, 0, -0.29, 0, 0, 0, 0, 0.11, 0.12, 0.11);
+      elbow.add(fore.build());
+      shoulder.add(upperArm, elbow);
+      this.upper.add(shoulder);
+      this.shoulders.push(shoulder);
+    }
+    this.character.add(this.upper);
   }
 
   private buildPompwagen(): void {
-    const orange = new THREE.MeshStandardMaterial({ color: 0xd9651f, roughness: 0.45, metalness: 0.4 });
-    const steel = new THREE.MeshStandardMaterial({ color: 0x565d68, roughness: 0.4, metalness: 0.6 });
-    const rubber = new THREE.MeshStandardMaterial({ color: 0x24262c, roughness: 0.9 });
+    const orange = mat(0xd9651f, 0.45, 0.4);
+    const steel = mat(0x565d68, 0.4, 0.6);
+    const chrome = mat(0xcfd5dc, 0.2, 0.9);
+    const rubber = mat(0x24262c, 0.9);
 
-    // steering head at group origin: hydraulic pump body + steering wheels
-    const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.34, 10), orange);
-    pump.position.y = 0.26;
-    this.steerHead.add(pump);
-    const wheelGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.06, 12);
+    // steering head at group origin: pump, ram, wheel fork
+    const head = new MergeBuilder();
+    head.add(unitCylinder, orange, 0, 0.3, 0, 0, 0, 0, 0.16, 0.34, 0.16);
+    head.add(unitCylinder, chrome, 0, 0.52, 0, 0, 0, 0, 0.06, 0.12, 0.06);
+    head.box(0.3, 0.05, 0.16, steel, 0, 0.14, 0);
+    this.steerHead.add(head.build());
+    const wheelGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.06, 14);
     wheelGeo.rotateZ(Math.PI / 2);
     for (const sx of [-1, 1]) {
       const w = new THREE.Mesh(wheelGeo, rubber);
       w.position.set(sx * 0.1, 0.09, 0);
       this.steerHead.add(w);
-      this.steerWheels.push(w);
+      this.wheels.push(w);
     }
     this.pompwagen.add(this.steerHead);
 
-    // forks extending backward (-z local)
-    const forkGeo = new THREE.BoxGeometry(0.17, 0.08, 1.2);
+    // chassis + forks extending backward (-z local)
+    const body = new MergeBuilder();
+    body.box(0.6, 0.2, 0.16, orange, 0, 0.2, -0.16);
+    body.box(0.5, 0.03, 0.12, steel, 0, 0.31, -0.16);
     for (const sx of [-1, 1]) {
-      const fork = new THREE.Mesh(forkGeo, orange);
-      fork.position.set(sx * 0.2, 0.14, -0.72);
-      fork.castShadow = true;
-      this.pompwagen.add(fork);
-      // fork tip rollers
-      const rollGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.1, 10);
-      rollGeo.rotateZ(Math.PI / 2);
-      const roll = new THREE.Mesh(rollGeo, rubber);
-      roll.position.set(sx * 0.2, 0.055, -1.25);
-      this.pompwagen.add(roll);
-      this.forkWheels.push(roll);
+      body.box(0.16, 0.07, 1.15, orange, sx * 0.2, 0.12, -0.8);
+      body.box(0.12, 0.05, 0.14, orange, sx * 0.2, 0.1, -1.42);
+      body.box(0.1, 0.02, 1.0, steel, sx * 0.2, 0.08, -0.8);
     }
-    // cross member
-    const cross = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.16, 0.14), orange);
-    cross.position.set(0, 0.16, -0.14);
-    this.pompwagen.add(cross);
+    const bodyGroup = body.build();
+    this.pompwagen.add(bodyGroup);
+    const rollGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.1, 10);
+    rollGeo.rotateZ(Math.PI / 2);
+    for (const sx of [-1, 1]) {
+      for (const z of [-1.3, -0.3]) {
+        const roll = new THREE.Mesh(rollGeo, rubber);
+        roll.position.set(sx * 0.2, 0.05, z);
+        this.pompwagen.add(roll);
+        this.wheels.push(roll);
+      }
+    }
 
-    // pallet mount points on the forks (second one stacks for the electric model)
-    for (let i = 0; i < 2; i++) {
+    // pallet mount points on the forks (second stacks for the electric model)
+    for (let i = 0; i < vehicles.electric.capacity; i++) {
       const m = new THREE.Group();
-      m.position.set(0, 0.19 + i * 1.12, -0.72);
+      m.position.set(0, 0.16 + i * 1.18, -0.8);
+      m.rotation.y = Math.PI / 2;
+      m.scale.setScalar(0.95);
       m.visible = false;
       this.pompwagen.add(m);
       this.palletMounts.push(m);
-      const pallet = createPallet();
-      pallet.scale.setScalar(0.95);
-      pallet.rotation.y = Math.PI / 2;
-      m.add(pallet);
     }
 
-    // electric variant extras: battery chassis + platform
-    const battery = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.6, 0.42), new THREE.MeshStandardMaterial({ color: 0x38a169, roughness: 0.4, metalness: 0.3 }));
-    battery.position.set(0, 0.34, 0.26);
-    battery.castShadow = true;
-    this.electricParts.add(battery);
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.3), steel);
-    platform.position.set(0, 0.1, 0.55);
-    this.electricParts.add(platform);
+    // electric variant: battery hood, stand-on plate, control head
+    const e = new MergeBuilder();
+    e.box(0.62, 0.55, 0.42, mat(0x2f8f5b, 0.4, 0.3), 0, 0.42, 0.24);
+    e.box(0.64, 0.05, 0.44, mat(0x1d2127, 0.6), 0, 0.72, 0.24);
+    e.box(0.64, 0.08, 0.02, mat(0xf2c018, 0.5), 0, 0.5, 0.455);
+    e.box(0.55, 0.04, 0.34, steel, 0, 0.07, 0.62);
+    e.add(unitCylinder, mat(0x1d2127, 0.6), 0, 0.84, 0.3, 0, 0, 0, 0.08, 0.2, 0.08);
+    this.electricParts.add(e.build());
     this.pompwagen.add(this.electricParts);
-    this.pompwagen.add(this.manualParts);
   }
 
-  /** update carried pallet visuals */
-  setCarrying(n: number): void {
-    this.carrying = n;
-    this.palletMounts.forEach((m, i) => (m.visible = i < n));
+  /** update carried pallet visuals (one product id per pallet) */
+  setCargo(products: string[]): void {
+    this.cargo = [...products];
+    this.palletMounts.forEach((m, i) => {
+      const pid = products[i];
+      m.visible = !!pid;
+      if (!pid || m.userData.product === pid) return;
+      m.clear();
+      m.add(createPallet(pid));
+      m.userData.product = pid;
+    });
   }
 
   // ---------- movement ----------
 
   update(dt: number, inputX: number, inputY: number, colliders: AABB[]): void {
-    const loaded = this.carrying > 0;
-    const maxSpeed = this.cfg.maxSpeed * (loaded ? this.cfg.loadedSpeedFactor : 1) * (1 + (this.speedBonus ?? 0));
+    const loaded = this.cargo.length > 0;
+    const maxSpeed = this.cfg.maxSpeed * (loaded ? this.cfg.loadedSpeedFactor : 1) * (1 + this.speedBonus);
     const turnSpeed = this.cfg.turnSpeed * (loaded ? this.cfg.loadedTurnFactor : 1);
     const mag = Math.min(1, Math.hypot(inputX, inputY));
 
@@ -210,18 +289,14 @@ export class Player {
     }
 
     // --- trailer links ---
-    // hands / hitch point slightly behind the character
-    const hx = this.x - Math.sin(this.heading) * 0.3;
-    const hz = this.z - Math.cos(this.heading) * 0.3;
-    // link 1: steering head follows the hitch at handleLength
+    const hx = this.x - Math.sin(this.heading) * 0.34;
+    const hz = this.z - Math.cos(this.heading) * 0.34;
     let dx = hx - this.steerPos.x;
     let dz = hz - this.steerPos.y;
     let len = Math.hypot(dx, dz) || 1e-6;
     this.steerPos.set(hx - (dx / len) * this.cfg.handleLength, hz - (dz / len) * this.cfg.handleLength);
-    // keep the pompwagen out of walls too
     const sp = this.resolve(this.steerPos.x, this.steerPos.y, 0.3, colliders);
     this.steerPos.set(sp.x, sp.z);
-    // link 2: body pivots around the fork rollers
     dx = this.steerPos.x - this.rollerPos.x;
     dz = this.steerPos.y - this.rollerPos.y;
     len = Math.hypot(dx, dz) || 1e-6;
@@ -239,30 +314,46 @@ export class Player {
     const bodyYaw = Math.atan2(this.steerPos.x - this.rollerPos.x, this.steerPos.y - this.rollerPos.y);
     this.pompwagen.position.set(this.steerPos.x, 0, this.steerPos.y);
     this.pompwagen.rotation.y = bodyYaw;
-
-    // steering head turns toward the handle
     const handleYaw = Math.atan2(hx - this.steerPos.x, hz - this.steerPos.y);
     this.steerHead.rotation.y = handleYaw - bodyYaw;
 
-    // handle mesh between hands (high) and steering head (low)
-    const hand = new THREE.Vector3(hx, 0.82, hz);
-    const pivot = new THREE.Vector3(this.steerPos.x, 0.32, this.steerPos.y);
-    const mid = hand.clone().add(pivot).multiplyScalar(0.5);
-    this.handleMesh.position.copy(mid);
+    // handle between the hands (high) and the steering head (low)
+    const hand = new THREE.Vector3(hx, 0.86, hz);
+    const pivot = new THREE.Vector3(this.steerPos.x, 0.34, this.steerPos.y);
     const dir = hand.clone().sub(pivot);
-    this.handleMesh.scale.set(1, dir.length(), 1);
-    this.handleMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    this.handleShaft.position.copy(hand).add(pivot).multiplyScalar(0.5);
+    this.handleShaft.scale.set(1, dir.length(), 1);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    this.handleShaft.quaternion.copy(q);
+    this.handle.position.copy(hand);
+    this.handle.quaternion.copy(q);
 
-    // wheels spin with speed, legs walk
+    // wheels spin with speed
     const spin = this.speed * dt * 10;
-    for (const w of [...this.steerWheels, ...this.forkWheels]) w.rotation.x += spin;
-    this.walkT += this.speed * dt * 6;
-    const swing = this.speed > 0.2 ? Math.sin(this.walkT) * 0.5 : 0;
-    this.legL.rotation.x = swing;
-    this.legR.rotation.x = -swing;
+    for (const w of this.wheels) w.rotation.x += spin;
+
+    this.animateWalk(dt);
+    this.beacon.visible = Math.sin(performance.now() * 0.012) > 0;
   }
 
-  speedBonus = 0;
+  private animateWalk(dt: number): void {
+    const moving = Math.min(1, this.speed / 2);
+    this.walkT += this.speed * dt * 4.2;
+    this.idleT += dt;
+    const s = Math.sin(this.walkT);
+    const amp = 0.55 * moving;
+    this.legs.forEach((leg, i) => {
+      const side = i === 0 ? 1 : -1;
+      leg.hip.rotation.x = s * amp * side;
+      leg.knee.rotation.x = Math.max(0, Math.sin(this.walkT * side + 1.2 * side)) * amp * 1.2;
+    });
+    this.shoulders.forEach((sh, i) => {
+      const side = i === 0 ? 1 : -1;
+      sh.rotation.x = 0.5 - s * 0.08 * moving * side;
+    });
+    this.upper.position.y = HIP_Y + Math.abs(Math.cos(this.walkT)) * 0.03 * moving + Math.sin(this.idleT * 2) * 0.004;
+    this.upper.rotation.x = 0.1 * moving;
+  }
 
   private resolve(nx: number, nz: number, r: number, colliders: AABB[]): { x: number; z: number } {
     let x = nx;
@@ -280,7 +371,7 @@ export class Player {
           x += dx * push;
           z += dz * push;
         } else {
-          z = c.maxZ + r; // degenerate: push out along +z
+          z = c.maxZ + r;
         }
       }
     }

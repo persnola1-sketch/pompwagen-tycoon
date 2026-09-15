@@ -1,8 +1,16 @@
 import * as THREE from 'three';
 import layout from '../config/layout.json';
 import { TruckKind } from '../core/EventBus';
-import { textSprite } from './Textures';
-import { createPallet } from './Pallet';
+import { MergeBuilder, glow, mat, unitBox, unitCylinder } from './Merge';
+import { PALLET_TOP, palletWoodGeometry, palletWoodMaterial } from './Pallet';
+import { LoadInstances } from './ProductVisuals';
+import { liveryTexture, plateTexture, textSprite } from './Textures';
+
+const T = layout.truck;
+const TRAILER_LEN = 9.0;
+const KINGPIN_Z = 8.2;
+const FLOOR_Y = 0.75;
+const MAX_CARGO = T.maxVisibleCargo;
 
 interface Segment {
   x0: number; z0: number; r0: number;
@@ -11,10 +19,39 @@ interface Segment {
   reverse: boolean;
 }
 
+const LIVERIES: [number, string][] = [
+  [0x2563b8, '#ffd23f'],
+  [0xc2571f, '#ffffff'],
+  [0x2f9e4f, '#ffe066'],
+  [0x7b3fc2, '#ffd23f'],
+  [0xb83a63, '#ffffff'],
+  [0x1f8a8a, '#ffd23f'],
+  [0x2f3642, '#f2c018'],
+  [0xd6a21e, '#1b2230'],
+];
+
+function hash(s: string): number {
+  let h = 0;
+  for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h;
+}
+
+const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
+
+/** add a truck wheel (tyre + rim + hub) to a merge builder, axis along x */
+function addWheel(b: MergeBuilder, x: number, z: number, r: number, w: number): void {
+  const tyre = mat(0x1c1d21, 0.92);
+  const rim = mat(0xb9c0c8, 0.3, 0.8);
+  const side = Math.sign(x);
+  b.add(unitCylinder, tyre, x, r, z, 0, 0, Math.PI / 2, r * 2, w, r * 2);
+  b.add(unitCylinder, rim, x + side * 0.01, r, z, 0, 0, Math.PI / 2, r * 1.2, w + 0.01, r * 1.2);
+  b.add(unitCylinder, mat(0x3a3f48, 0.5, 0.6), x + side * 0.02, r, z, 0, 0, Math.PI / 2, r * 0.4, w + 0.03, r * 0.4);
+}
+
 /**
- * A box truck that visibly drives in from the road, swings around, reverses
- * to the dock door, waits while (un)loading, then drives away.
- * Model faces +z in local space; rotation.y=0 → forward (0,0,1).
+ * Articulated truck (tractor + box semi-trailer) in company colours. It drives
+ * in from the road, swings around, reverses to the dock, opens its rear doors
+ * while (un)loading, then drives away. Root origin = trailer rear, model faces +z.
  */
 export class Truck {
   readonly group = new THREE.Group();
@@ -27,210 +64,286 @@ export class Truck {
   private segs: Segment[] = [];
   private segIndex = 0;
   private segT = 0;
-  private wheels: THREE.Mesh[] = [];
-  private nameMats: THREE.MeshBasicMaterial[] = [];
-  private labelMat: THREE.MeshBasicMaterial;
-  private label: THREE.Mesh;
-  private cargo: THREE.Group[] = [];
-  private cargoRoot = new THREE.Group();
   private beepTimer = 0;
   private side: number;
-  private readonly length = 7.5;
+
+  private tractor = new THREE.Group();
+  private articulation = 0;
+  private lastYaw = 0;
+  private paint = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.3 });
+  private liveryMat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 });
+  private plateMat = new THREE.MeshBasicMaterial();
+  private doors: THREE.Group[] = [];
+  private doorOpen = 0;
+  private labelMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
+  private label: THREE.Mesh;
+
+  private woodInst: THREE.InstancedMesh;
+  private loads = new LoadInstances(MAX_CARGO, PALLET_TOP);
 
   constructor(kind: TruckKind, parent: THREE.Object3D) {
     this.kind = kind;
     this.side = kind === 'supplier' ? -1 : 1;
-    this.buildModel(kind === 'supplier' ? 0x2563b8 : 0xc2571f);
+    this.buildTrailer();
+    this.buildTractor();
+    this.tractor.position.z = KINGPIN_Z;
+    this.group.add(this.tractor);
+
+    this.label = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.1), this.labelMat);
+    this.label.position.set(0, 5.2, 3.5);
+    this.label.visible = false;
+    this.label.renderOrder = 10;
+    this.group.add(this.label);
+
+    this.woodInst = new THREE.InstancedMesh(palletWoodGeometry(), palletWoodMaterial(), MAX_CARGO);
+    this.woodInst.count = 0;
+    this.woodInst.visible = false;
+    this.woodInst.frustumCulled = false;
+    this.woodInst.castShadow = true;
+    this.group.add(this.woodInst, this.loads.mesh);
+
     this.group.visible = false;
     parent.add(this.group);
-
-    this.labelMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
-    this.label = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.0), this.labelMat);
-    this.label.position.set(0, 4.6, 2.5);
-    this.label.visible = false;
-    this.group.add(this.label);
-    this.group.add(this.cargoRoot);
   }
 
-  private buildModel(color: number): void {
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8eaee, roughness: 0.5, metalness: 0.15 });
-    const cabMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.25 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x24262c, roughness: 0.85 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x9cc4e0, roughness: 0.15, metalness: 0.6 });
+  // ---------- model ----------
 
-    // trailer box with an open rear (rear at z=0.15) so cargo shows at the dock
-    const panels: [number, number, number, number, number, number][] = [
-      [2.5, 0.08, 5.4, 0, 3.21, 2.85], // roof
-      [2.5, 0.08, 5.4, 0, 0.59, 2.85], // floor
-      [0.07, 2.7, 5.4, -1.22, 1.9, 2.85], // left
-      [0.07, 2.7, 5.4, 1.22, 1.9, 2.85], // right
-      [2.5, 2.7, 0.07, 0, 1.9, 5.52], // front
-    ];
-    for (const [w, h, d, x, y, z] of panels) {
-      const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), bodyMat);
-      p.position.set(x, y, z);
-      p.castShadow = true;
-      this.group.add(p);
-    }
-    // rolled-up rear shutter hint
-    const shutter = new THREE.Mesh(
-      new THREE.BoxGeometry(2.3, 0.25, 0.25),
-      new THREE.MeshStandardMaterial({ color: 0x8d939c, roughness: 0.5, metalness: 0.5 }),
-    );
-    shutter.position.set(0, 3.0, 0.3);
-    this.group.add(shutter);
+  private buildTrailer(): void {
+    const b = new MergeBuilder();
+    const white = mat(0xeef1f4, 0.45, 0.1);
+    const alu = mat(0xaeb5bd, 0.35, 0.75);
+    const dark = mat(0x24272d, 0.8);
+    const L = TRAILER_LEN;
+    const H = 2.65;
 
-    // company name planes on both trailer sides
+    b.box(2.5, 0.16, L, dark, 0, FLOOR_Y - 0.08, L / 2);
+    b.box(2.36, 0.02, L - 0.2, mat(0x6b5a45, 0.9), 0, FLOOR_Y + 0.01, L / 2);
     for (const sx of [-1, 1]) {
-      const m = new THREE.MeshBasicMaterial({ transparent: true });
-      const p = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.4), m);
-      p.position.set(sx * 1.26, 2.1, 2.85);
-      p.rotation.y = sx * Math.PI / 2;
-      this.group.add(p);
-      this.nameMats.push(m);
+      b.box(0.05, H, L, white, sx * 1.225, FLOOR_Y + H / 2, L / 2);
+      b.box(0.08, 0.1, L, alu, sx * 1.24, FLOOR_Y + H, L / 2);
+      b.box(0.09, 0.2, L, alu, sx * 1.24, FLOOR_Y + 0.06, L / 2);
+      b.box(0.12, H + 0.1, 0.12, alu, sx * 1.21, FLOOR_Y + H / 2, 0.06);
+      b.box(0.1, H, 0.1, alu, sx * 1.21, FLOOR_Y + H / 2, L - 0.05);
+      b.box(0.04, 0.5, 3.6, dark, sx * 1.16, FLOOR_Y - 0.4, 6.3); // side skirt
+      b.box(0.1, 0.72, 0.1, dark, sx * 0.85, (FLOOR_Y - 0.1) / 2, 7.3); // landing gear
+      b.box(0.25, 0.04, 0.25, dark, sx * 0.85, 0.02, 7.3);
+      b.box(0.5, 0.5, 0.02, dark, sx * 0.95, 0.4, 0.75); // mud flap
+      b.box(0.34, 0.14, 0.04, glow(0xd23b3b), sx * 0.9, 0.55, 0.12); // tail light
+      b.box(0.1, 0.1, 0.04, glow(0xffa21a), sx * 1.15, 0.55, 0.12);
+      for (let z = 2; z < L - 0.5; z += 2) b.box(0.03, 0.06, 0.1, glow(0xffa21a), sx * 1.29, FLOOR_Y + 0.06, z);
     }
+    b.box(2.5, 0.06, L, white, 0, FLOOR_Y + H + 0.03, L / 2);
+    b.box(2.5, H, 0.05, white, 0, FLOOR_Y + H / 2, L - 0.03);
+    b.box(2.5, 0.22, 0.12, alu, 0, FLOOR_Y + H - 0.05, 0.06);
+    b.box(2.5, 0.16, 0.14, dark, 0, FLOOR_Y - 0.02, 0.07);
+    b.box(2.3, 0.14, 0.12, mat(0xd8d8d0, 0.5, 0.4), 0, 0.42, 0.15); // underride bar
+    for (const z of [1.5, 2.8, 4.1]) {
+      for (const sx of [-1, 1]) addWheel(b, sx * 0.95, z, 0.48, 0.42);
+      b.box(1.6, 0.12, 0.12, dark, 0, 0.48, z);
+    }
+    this.group.add(b.build());
 
-    // chassis
-    const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 6.6), darkMat);
-    chassis.position.set(0, 0.7, 3.4);
-    this.group.add(chassis);
+    // company livery on both sides
+    for (const sx of [-1, 1]) {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(L - 0.6, H - 0.35), this.liveryMat);
+      p.position.set(sx * 1.253, FLOOR_Y + H / 2, L / 2);
+      p.rotation.y = (sx * Math.PI) / 2;
+      this.group.add(p);
+    }
+    const rearPlate = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), this.plateMat);
+    rearPlate.position.set(0, 0.62, 0.08);
+    rearPlate.rotation.y = Math.PI;
+    this.group.add(rearPlate);
 
+    // rear doors hinged at the corners
+    const doorGeo = new THREE.BoxGeometry(1.22, H - 0.1, 0.04);
+    const doorMat = mat(0xdfe3e8, 0.5, 0.15);
+    for (const sx of [-1, 1]) {
+      const hinge = new THREE.Group();
+      hinge.position.set(sx * 1.27, FLOOR_Y + H / 2, -0.02);
+      const door = new THREE.Mesh(doorGeo, doorMat);
+      door.position.x = -sx * 0.61;
+      door.castShadow = true;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.3, 0.045), this.paint);
+      stripe.position.set(-sx * 0.61, -0.7, 0);
+      const bars = new THREE.Mesh(new THREE.BoxGeometry(0.05, H - 0.2, 0.08), mat(0xaeb5bd, 0.35, 0.75));
+      bars.position.set(-sx * 0.35, 0, -0.03);
+      hinge.add(door, stripe, bars);
+      this.group.add(hinge);
+      this.doors.push(hinge);
+    }
+  }
+
+  private buildTractor(): void {
+    const b = new MergeBuilder();
+    const dark = mat(0x24272d, 0.8);
+    const chrome = mat(0xd6dce2, 0.2, 0.9);
+    const glass = mat(0x1d3347, 0.1, 0.8);
+    const p = this.paint;
+
+    b.box(0.9, 0.25, 5.4, dark, 0, 0.75, 1.9);
+    b.box(1.3, 0.1, 1.2, mat(0x3a3f48, 0.6, 0.5), 0, 0.95, 0);
+    b.box(2.3, 0.08, 1.4, dark, 0, 1.12, 0); // rear fenders
+    b.add(unitCylinder, chrome, 1.0, 0.72, 2.0, Math.PI / 2, 0, 0, 0.55, 1.2, 0.55); // fuel tank
+    b.box(0.45, 0.5, 0.8, dark, -1.0, 0.75, 2.0); // battery box
     // cab
-    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.9, 1.7), cabMat);
-    cab.position.set(0, 1.55, 6.55);
-    cab.castShadow = true;
-    this.group.add(cab);
-    const windshield = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 0.06), glassMat);
-    windshield.position.set(0, 1.9, 7.42);
-    this.group.add(windshield);
-    // bumper + lights
-    const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 0.25), darkMat);
-    bumper.position.set(0, 0.55, 7.45);
-    this.group.add(bumper);
+    b.box(2.45, 1.35, 2.05, p, 0, 1.78, 3.85);
+    b.box(2.45, 1.2, 1.9, p, 0, 3.05, 3.78);
+    b.add(unitBox, p, 0, 3.92, 3.35, -0.3, 0, 0, 2.3, 0.45, 1.3); // roof fairing
+    b.box(2.2, 0.1, 1.9, p, 0, 3.68, 3.78);
+    b.add(unitBox, glass, 0, 3.08, 4.74, -0.07, 0, 0, 2.2, 1.0, 0.05);
     for (const sx of [-1, 1]) {
-      const light = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.18, 0.08),
-        new THREE.MeshBasicMaterial({ color: 0xfff2c0 }),
-      );
-      light.position.set(sx * 0.9, 0.85, 7.5);
-      this.group.add(light);
-      const tail = new THREE.Mesh(
-        new THREE.BoxGeometry(0.22, 0.18, 0.06),
-        new THREE.MeshBasicMaterial({ color: 0xd23b3b }),
-      );
-      tail.position.set(sx * 1.05, 0.85, 0.12);
-      this.group.add(tail);
+      b.box(0.04, 0.7, 0.9, glass, sx * 1.23, 3.12, 4.2);
+      b.box(0.04, 0.08, 0.25, chrome, sx * 1.235, 2.3, 3.6); // door handle
+      b.box(0.06, 0.06, 0.4, dark, sx * 1.36, 3.25, 4.55); // mirror arm
+      b.box(0.08, 0.48, 0.22, dark, sx * 1.56, 3.05, 4.62); // mirror
+      b.box(0.22, 0.05, 0.5, mat(0xaeb5bd, 0.35, 0.75), sx * 1.28, 1.02, 3.3); // steps
+      b.box(0.22, 0.05, 0.5, mat(0xaeb5bd, 0.35, 0.75), sx * 1.28, 0.62, 3.3);
+      b.box(0.5, 0.1, 1.2, dark, sx * 1.02, 1.12, 3.4); // front fender
+      b.box(0.45, 0.16, 0.05, glow(0xfff4d6), sx * 0.85, 1.18, 4.93); // headlight
+      b.box(0.14, 0.1, 0.05, glow(0xffa21a), sx * 1.12, 1.18, 4.93);
+      addWheel(b, sx * 1.02, 3.4, 0.5, 0.36);
+      addWheel(b, sx * 0.95, 0, 0.5, 0.5);
     }
+    b.box(2.3, 0.08, 0.32, dark, 0, 3.64, 4.88); // sun visor
+    for (let i = 0; i < 5; i++) b.box(0.12, 0.06, 0.06, glow(0xffa21a), -0.8 + i * 0.4, 3.72, 4.7);
+    b.box(1.55, 0.95, 0.05, dark, 0, 1.95, 4.9); // grille
+    for (let i = 0; i < 5; i++) b.box(1.45, 0.04, 0.03, chrome, 0, 1.6 + i * 0.18, 4.93);
+    b.box(2.5, 0.36, 0.3, dark, 0, 0.82, 4.95); // bumper
+    this.tractor.add(b.build());
 
-    // wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.35, 14);
-    wheelGeo.rotateZ(Math.PI / 2);
-    for (const wz of [1.1, 2.2, 6.3]) {
-      for (const sx of [-1, 1]) {
-        const w = new THREE.Mesh(wheelGeo, darkMat);
-        w.position.set(sx * 1.15, 0.5, wz);
-        this.group.add(w);
-        this.wheels.push(w);
-      }
-    }
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), this.plateMat);
+    plate.position.set(0, 0.84, 5.11);
+    this.tractor.add(plate);
   }
 
-  /** show pallets stacked inside the (roofless-when-docked) trailer via count label + rear stack */
-  setCargoCount(n: number): void {
-    while (this.cargo.length > n) {
-      const p = this.cargo.pop()!;
-      this.cargoRoot.remove(p);
-    }
-    while (this.cargo.length < n) {
-      const i = this.cargo.length;
-      const p = createPallet();
-      p.scale.setScalar(0.92);
-      const col = i % 2;
-      const row = Math.floor(i / 2) % 4;
-      const lvl = Math.floor(i / 8);
-      p.position.set(-0.55 + col * 1.1, 0.64 + lvl * 1.1, 0.75 + row * 1.28);
-      p.rotation.y = Math.PI / 2;
-      this.cargoRoot.add(p);
-      this.cargo.push(p);
-    }
+  private applyCompany(name: string): void {
+    const [primary, accent] = LIVERIES[hash(name) % LIVERIES.length];
+    this.paint.color.setHex(primary);
+    this.liveryMat.map?.dispose();
+    this.liveryMat.map = liveryTexture(name, hex(primary), accent);
+    this.liveryMat.needsUpdate = true;
+    const h = hash(name + this.kind);
+    const letters = 'BDFGHJKLNPRSTVXZ';
+    const plate = `${letters[h % 16]}${letters[(h >> 4) % 16]}-${100 + (h % 900)}-${letters[(h >> 8) % 16]}`;
+    this.plateMat.map?.dispose();
+    this.plateMat.map = plateTexture(plate);
+    this.plateMat.needsUpdate = true;
+  }
+
+  // ---------- cargo ----------
+
+  /** pallets inside the trailer, one product id each, front first */
+  setCargo(products: string[]): void {
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    const s = new THREE.Vector3(0.92, 0.92, 0.92);
+    const v = new THREE.Vector3();
+    const perRow = 2;
+    const rows = 7;
+    const list = products.slice(0, MAX_CARGO);
+    this.loads.begin();
+    list.forEach((pid, i) => {
+      const lvl = Math.floor(i / (perRow * rows));
+      const k = i % (perRow * rows);
+      const row = Math.floor(k / perRow);
+      const col = k % perRow;
+      v.set(-0.58 + col * 1.16, FLOOR_Y + lvl * 1.3, TRAILER_LEN - 0.75 - row * 1.22);
+      m.compose(v, q, s);
+      this.woodInst.setMatrixAt(i, m);
+      this.loads.push(pid, m);
+    });
+    this.woodInst.count = list.length;
+    this.woodInst.visible = list.length > 0;
+    this.woodInst.instanceMatrix.needsUpdate = true;
+    this.loads.end();
   }
 
   setLabel(text: string): void {
     this.labelMat.map?.dispose();
-    this.labelMat.map = textSprite(text, 'rgba(20,24,32,0.75)', '#ffffff', 512, 192, 56);
+    this.labelMat.map = textSprite(text, 'rgba(20,24,32,0.8)', '#ffffff', 512, 160, 52);
     this.labelMat.needsUpdate = true;
     this.label.visible = true;
   }
 
-  startArrival(companyName: string, cargoCount: number): void {
-    const cfg = this.kind === 'supplier' ? layout.truck.inbound : layout.truck.outbound;
+  // ---------- driving ----------
+
+  startArrival(companyName: string, cargo: string[]): void {
+    const cfg = this.kind === 'supplier' ? T.inbound : T.outbound;
     const wallX = this.side * (layout.warehouse.width / 2);
     const dockZ = layout.docks.doorZ[0];
     const laneX = cfg.approach.x;
-    // heading: driving south (0,-1) → ry = PI ; facing away from warehouse: ry = side * PI/2
     const away = this.side < 0 ? -Math.PI / 2 : Math.PI / 2;
-    const v = layout.truck.driveSpeed;
-    // rear pokes through the dock door so the docked truck is visible inside
-    const rearAtDock = wallX - this.side * 1.2;
-    const preDockX = wallX + this.side * (this.length + 1.2);
+    const awayWrapped = away + (this.side < 0 ? Math.PI * 2 : 0);
+    const v = T.driveSpeed;
+    const rearAtDock = wallX - this.side * T.rearInsideDoor;
+    const preDockX = wallX + this.side * (T.length + T.rearInsideDoor);
+    const turnZ = dockZ + T.turnInDistance;
 
-    for (const m of this.nameMats) {
-      m.map?.dispose();
-      m.map = textSprite(companyName, 'rgba(255,255,255,0)', this.kind === 'supplier' ? '#2563b8' : '#c2571f', 512, 160, 72);
-      m.needsUpdate = true;
-    }
-    this.setCargoCount(cargoCount);
+    this.applyCompany(companyName);
+    this.setCargo(cargo);
+    this.label.visible = false;
 
     this.segs = [
-      { x0: cfg.spawn.x, z0: cfg.spawn.z, r0: Math.PI, x1: laneX, z1: dockZ + 9, r1: Math.PI, dur: Math.abs(cfg.spawn.z - (dockZ + 9)) / v, reverse: false },
-      // swing around to face away from the warehouse
-      { x0: laneX, z0: dockZ + 9, r0: Math.PI, x1: preDockX, z1: dockZ, r1: away + (this.side < 0 ? Math.PI * 2 : 0), dur: 2.2, reverse: false },
-      // reverse to the dock
-      { x0: preDockX, z0: dockZ, r0: away + (this.side < 0 ? Math.PI * 2 : 0), x1: rearAtDock, z1: dockZ, r1: away + (this.side < 0 ? Math.PI * 2 : 0), dur: Math.abs(preDockX - rearAtDock) / layout.truck.reverseSpeed, reverse: true },
+      { x0: cfg.spawn.x, z0: cfg.spawn.z, r0: Math.PI, x1: laneX, z1: turnZ, r1: Math.PI, dur: Math.abs(cfg.spawn.z - turnZ) / v, reverse: false },
+      { x0: laneX, z0: turnZ, r0: Math.PI, x1: preDockX, z1: dockZ, r1: awayWrapped, dur: T.swingDuration, reverse: false },
+      { x0: preDockX, z0: dockZ, r0: awayWrapped, x1: rearAtDock, z1: dockZ, r1: awayWrapped, dur: Math.abs(preDockX - rearAtDock) / T.reverseSpeed, reverse: true },
     ];
     this.segIndex = 0;
     this.segT = 0;
     this.phase = 'arriving';
     this.group.visible = true;
+    this.articulation = 0;
     this.applyPose(this.segs[0], 0);
+    this.lastYaw = this.group.rotation.y;
   }
 
   startDeparture(): void {
-    const cfg = this.kind === 'supplier' ? layout.truck.inbound : layout.truck.outbound;
+    const cfg = this.kind === 'supplier' ? T.inbound : T.outbound;
     const dockZ = layout.docks.doorZ[0];
     const away = this.side < 0 ? -Math.PI / 2 : Math.PI / 2;
     const wallX = this.side * (layout.warehouse.width / 2);
-    const rearAtDock = wallX - this.side * 1.2;
+    const rearAtDock = wallX - this.side * T.rearInsideDoor;
     const laneX = cfg.approach.x;
-    const v = layout.truck.driveSpeed;
+    const outZ = dockZ - T.pullOutDistance;
     this.label.visible = false;
-
-    // south-facing heading chosen so the nose swings away from the warehouse
     const south = this.side < 0 ? -Math.PI : Math.PI;
     this.segs = [
-      // pull away from the dock, swinging toward the exit lane
-      { x0: rearAtDock, z0: dockZ, r0: away, x1: laneX, z1: dockZ - 6, r1: south, dur: 2.4, reverse: false },
-      { x0: laneX, z0: dockZ - 6, r0: south, x1: cfg.exit.x, z1: cfg.exit.z, r1: south, dur: Math.abs(dockZ - 6 - cfg.exit.z) / v, reverse: false },
+      { x0: rearAtDock, z0: dockZ, r0: away, x1: laneX, z1: outZ, r1: south, dur: T.pullOutDuration, reverse: false },
+      { x0: laneX, z0: outZ, r0: south, x1: cfg.exit.x, z1: cfg.exit.z, r1: south, dur: Math.abs(outZ - cfg.exit.z) / T.driveSpeed, reverse: false },
     ];
     this.segIndex = 0;
     this.segT = 0;
     this.phase = 'leaving';
+    this.group.rotation.y = away;
+    this.lastYaw = away;
   }
 
   private applyPose(s: Segment, t: number): void {
-    // smoothstep ease within a segment
     const e = t * t * (3 - 2 * t);
     this.group.position.set(s.x0 + (s.x1 - s.x0) * e, 0, s.z0 + (s.z1 - s.z0) * e);
     this.group.rotation.y = s.r0 + (s.r1 - s.r0) * e;
   }
 
-  update(dt: number): void {
+  update(dt: number, camera: THREE.Camera): void {
+    // doors open while docked
+    const wantOpen = this.phase === 'docked' ? 1 : 0;
+    this.doorOpen += (wantOpen - this.doorOpen) * Math.min(1, dt * 2.5);
+    this.doors.forEach((d, i) => {
+      const sx = i === 0 ? -1 : 1;
+      d.rotation.y = sx * -1 * this.doorOpen * Math.PI * 1.45;
+    });
+    if (this.label.visible) {
+      this.group.updateMatrixWorld();
+      const parentQ = new THREE.Quaternion();
+      this.group.getWorldQuaternion(parentQ);
+      this.label.quaternion.copy(parentQ.invert().multiply(camera.quaternion));
+    }
+
     if (this.phase === 'hidden' || this.phase === 'docked') return;
     const s = this.segs[this.segIndex];
     if (!s) return;
     this.segT += dt / s.dur;
-    const speed = Math.hypot(s.x1 - s.x0, s.z1 - s.z0) / s.dur;
-    for (const w of this.wheels) w.rotation.x += (s.reverse ? -1 : 1) * speed * dt * 2;
     if (s.reverse) {
       this.beepTimer -= dt;
       if (this.beepTimer <= 0) {
@@ -245,16 +358,27 @@ export class Truck {
       if (this.segIndex >= this.segs.length) {
         if (this.phase === 'arriving') {
           this.phase = 'docked';
+          this.articulation = 0;
+          this.tractor.rotation.y = 0;
           this.onDocked?.();
         } else {
           this.phase = 'hidden';
           this.group.visible = false;
-          this.setCargoCount(0);
+          this.setCargo([]);
           this.onGone?.();
         }
+        return;
       }
     } else {
       this.applyPose(s, this.segT);
     }
+
+    // fake articulation: the tractor leads the trailer through turns
+    const yaw = this.group.rotation.y;
+    const rate = dt > 0 ? (yaw - this.lastYaw) / dt : 0;
+    this.lastYaw = yaw;
+    const target = THREE.MathUtils.clamp(rate * 0.55 * (s.reverse ? -1 : 1), -0.6, 0.6);
+    this.articulation += (target - this.articulation) * Math.min(1, dt * 4);
+    this.tractor.rotation.y = this.articulation;
   }
 }

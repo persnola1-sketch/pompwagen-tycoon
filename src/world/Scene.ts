@@ -1,73 +1,121 @@
 import * as THREE from 'three';
+import cam from '../config/camera.json';
+import { CameraRig } from './CameraRig';
+
+const SHADOW_MAP = 1024;
 
 export class SceneRoot {
   readonly scene = new THREE.Scene();
-  readonly camera: THREE.PerspectiveCamera;
   readonly renderer: THREE.WebGLRenderer;
-  private followTarget = new THREE.Vector3();
-  private camGoal = new THREE.Vector3();
+  readonly rig: CameraRig;
+  private sun: THREE.DirectionalLight;
+  private fog: THREE.Fog;
+  private shadowExtent = cam.shadowExtent;
 
-  /** camera offset: angled top-down (~55°), pulled back further in portrait */
-  private baseOffset = new THREE.Vector3(0, 14, 9.5);
+  private pixelRatio: number;
+  private fpsTime = 0;
+  private fpsFrames = 0;
+  private warmup = 5;
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.pixelRatio = Math.min(window.devicePixelRatio, 2);
+    this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color(0x9fc4e8);
-    this.scene.fog = new THREE.Fog(0x9fc4e8, 60, 140);
+    const sky = 0xa9cdea;
+    this.scene.background = new THREE.Color(sky);
+    this.fog = new THREE.Fog(sky, cam.fogNear, cam.fogFar);
+    this.scene.fog = this.fog;
 
-    this.camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 220);
-    this.camera.position.set(0, 16, 12);
-    this.camera.lookAt(0, 0, 0);
+    this.rig = new CameraRig(window.innerWidth / window.innerHeight);
 
-    // warm interior key light (single shadow caster)
-    const sun = new THREE.DirectionalLight(0xfff0dc, 2.2);
-    sun.position.set(10, 22, 6);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -26;
-    sun.shadow.camera.right = 26;
-    sun.shadow.camera.top = 26;
-    sun.shadow.camera.bottom = -26;
-    sun.shadow.camera.far = 60;
-    sun.shadow.bias = -0.0015;
-    this.scene.add(sun);
-    this.scene.add(sun.target);
+    // the single shadow caster; follows the camera focus so shadows stay sharp
+    this.sun = new THREE.DirectionalLight(0xfff0dc, 2.3);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+    this.sun.shadow.bias = -0.0012;
+    this.sun.shadow.normalBias = 0.02;
+    this.setShadowExtent(this.shadowExtent);
+    this.scene.add(this.sun, this.sun.target);
 
-    const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x6b6458, 1.05);
-    this.scene.add(hemi);
-
-    const amb = new THREE.AmbientLight(0xffe8c8, 0.4);
-    this.scene.add(amb);
+    this.scene.add(new THREE.HemisphereLight(0xd6e8ff, 0x7a705f, 1.25));
+    this.scene.add(new THREE.AmbientLight(0xffe8c8, 0.35));
 
     window.addEventListener('resize', () => this.onResize());
     this.onResize();
   }
 
+  get camera(): THREE.PerspectiveCamera {
+    return this.rig.camera;
+  }
+
+  private setShadowExtent(e: number): void {
+    const c = this.sun.shadow.camera;
+    c.left = -e;
+    c.right = e;
+    c.top = e;
+    c.bottom = -e;
+    c.near = 1;
+    c.far = 120;
+    c.updateProjectionMatrix();
+    this.shadowExtent = e;
+  }
+
   private onResize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    this.camera.aspect = w / h;
-    // pull back more in portrait so the aisle width fits
-    const portrait = h > w;
-    this.baseOffset.set(0, portrait ? 13 : 11, portrait ? 12 : 10);
-    this.camera.updateProjectionMatrix();
+    this.rig.setAspect(w / h);
     this.renderer.setSize(w, h);
   }
 
-  follow(target: THREE.Vector3, dt: number): void {
-    this.followTarget.lerp(target, Math.min(1, dt * 5));
-    this.camGoal.copy(this.followTarget).add(this.baseOffset);
-    this.camera.position.lerp(this.camGoal, Math.min(1, dt * 5));
-    this.camera.lookAt(this.followTarget.x, this.followTarget.y, this.followTarget.z - 1.5);
+  update(dt: number, player: THREE.Vector3): void {
+    this.rig.update(dt, player);
+    const dist = this.rig.currentDistance;
+
+    const want = THREE.MathUtils.clamp(dist * 0.55, cam.shadowExtent, 80);
+    if (Math.abs(want - this.shadowExtent) > 2) this.setShadowExtent(want);
+    // snap to shadow texels to avoid shimmering while moving
+    const texel = (this.shadowExtent * 2) / SHADOW_MAP;
+    const f = this.rig.focusPoint;
+    const fx = Math.round(f.x / texel) * texel;
+    const fz = Math.round(f.z / texel) * texel;
+    this.sun.target.position.set(fx, 0, fz);
+    this.sun.position.set(fx + 16, 34, fz + 10);
+
+    this.fog.near = cam.fogNear + dist * 0.8;
+    this.fog.far = cam.fogFar + dist * 1.6;
+
+    this.adaptQuality(dt);
+  }
+
+  /** lower the pixel ratio step by step if the phone can't hold the target fps */
+  private adaptQuality(dt: number): void {
+    const q = cam.adaptiveQuality;
+    if (this.warmup > 0) {
+      this.warmup -= dt;
+      return;
+    }
+    this.fpsTime += dt;
+    this.fpsFrames++;
+    if (this.fpsTime < q.sampleSeconds) return;
+    const fps = this.fpsFrames / this.fpsTime;
+    this.fpsTime = 0;
+    this.fpsFrames = 0;
+    if (fps < q.lowFps && this.pixelRatio > q.minPixelRatio) {
+      this.pixelRatio = Math.max(q.minPixelRatio, this.pixelRatio - q.step);
+      this.renderer.setPixelRatio(this.pixelRatio);
+    }
+  }
+
+  get currentPixelRatio(): number {
+    return this.pixelRatio;
   }
 
   render(): void {

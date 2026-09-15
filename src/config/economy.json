@@ -1,43 +1,45 @@
 {
-  "startMoney": 60,
+  "startMoney": 80,
+  "interaction": { "actionCooldown": 0.45 },
   "supplier": {
-    "priceMin": 7,
-    "priceMax": 9,
-    "offerIntervalMin": 18,
-    "offerIntervalMax": 32,
-    "offerExpiry": 25,
-    "maxQueued": 1
+    "firstOfferDelay": 8,
+    "offerIntervalMin": 6,
+    "offerIntervalMax": 12,
+    "offerExpiry": 30
   },
   "customer": {
-    "priceMin": 13,
-    "priceMax": 16,
-    "offerIntervalMin": 16,
-    "offerIntervalMax": 28,
+    "firstOfferDelay": 3,
+    "offerIntervalMin": 4,
+    "offerIntervalMax": 9,
+    "retryDelay": 4,
     "offerExpiry": 30,
-    "deadlineBase": 75,
-    "deadlinePerPallet": 14,
+    "mixedOrderChance": 0.3,
+    "fillableChance": 0.85,
+    "deadlineBase": 90,
+    "deadlinePerPallet": 20,
     "fastDeliveryFraction": 0.5,
     "fastDeliveryRepBonus": 0.15,
-    "missedRepPenalty": 0.5,
-    "maxQueued": 1
+    "missedRepPenalty": 0.5
   },
   "reputation": { "start": 3, "min": 0, "max": 5, "priceBonusPerStar": 0.03 },
   "stages": [
-    { "key": "pompwagen",  "supplierMin": 4,  "supplierMax": 8,  "customerMin": 2,  "customerMax": 5 },
-    { "key": "electric",   "supplierMin": 8,  "supplierMax": 15, "customerMin": 5,  "customerMax": 10 },
-    { "key": "forklift",   "supplierMin": 15, "supplierMax": 30, "customerMin": 10, "customerMax": 20 }
+    { "key": "pompwagen", "supplierMin": 3, "supplierMax": 6, "customerMin": 2, "customerMax": 4 },
+    { "key": "electric", "supplierMin": 6, "supplierMax": 12, "customerMin": 4, "customerMax": 8 },
+    { "key": "forklift", "supplierMin": 12, "supplierMax": 24, "customerMin": 8, "customerMax": 16 }
   ],
   "payPads": {
-    "payRatePerSecond": 90,
-    "rackRowCosts": [80, 500, 1000, 1800],
-    "electricPompwagen": 1500,
-    "speedUpgrade": { "baseCost": 200, "costFactor": 1.6, "maxLevel": 3, "speedBonusPerLevel": 0.12 },
-    "secondDock": 1200
+    "payDuration": 1.8,
+    "minPayRatePerSecond": 80,
+    "rackRowCosts": [300, 1400, 2000, 2800, 3600, 4500],
+    "electricPompwagen": 1100,
+    "speedUpgrade": { "costs": [150, 1300, 2600], "speedBonusPerLevel": 0.12 }
   },
   "tutorial": {
+    "product": "water",
     "freeDeliveryPallets": 3,
     "customerPallets": 2,
-    "customerPricePerPallet": 14,
-    "completionBonus": 120
+    "customerPricePerPallet": 70,
+    "completionBonus": 0,
+    "doneMessageSeconds": 5
   }
 }

@@ -1,6 +1,30 @@
-import { GameState, SaveData } from './GameState';
+import layout from '../config/layout.json';
+import { GameState, SAVE_VERSION, SaveData, TOTAL_SLOTS } from './GameState';
+import { PRODUCTS, isProduct } from './Products';
 
 const KEY = 'pompwagen-tycoon-save';
+
+/** v1 saves had a single product and boolean slot occupancy in a different rack layout */
+function migrateV1(raw: Record<string, unknown>): SaveData {
+  const oldSlots = Array.isArray(raw.slots) ? raw.slots : [];
+  const stock = oldSlots.filter(Boolean).length;
+  const rackRows = Math.max(layout.rackRows.startRows, Math.min(layout.rackRows.rows.length, Number(raw.rackRows) || 0));
+  const capacity = rackRows * layout.rackRows.slotsPerRow;
+  const slots: (string | null)[] = new Array(TOTAL_SLOTS).fill(null);
+  for (let i = 0; i < Math.min(stock, capacity); i++) slots[i] = PRODUCTS[0].id;
+  return {
+    version: SAVE_VERSION,
+    money: Number(raw.money) || 0,
+    reputation: Number(raw.reputation) || 0,
+    rackRows,
+    slots,
+    electric: !!raw.electric,
+    speedLevel: Number(raw.speedLevel) || 0,
+    tutorialDone: !!raw.tutorialDone,
+    padProgress: {},
+    stats: (raw.stats as SaveData['stats']) ?? { shipped: 0, earned: 0, spent: 0 },
+  };
+}
 
 export class SaveSystem {
   constructor(private state: GameState) {}
@@ -17,9 +41,16 @@ export class SaveSystem {
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return false;
-      const data = JSON.parse(raw) as SaveData;
-      if (data.version !== 1) return false;
-      this.state.loadFrom(data);
+      const data = JSON.parse(raw) as Record<string, unknown>;
+      if (data.version === 1) {
+        this.state.loadFrom(migrateV1(data));
+      } else if (data.version === SAVE_VERSION) {
+        const d = data as unknown as SaveData;
+        d.slots = d.slots.map((s) => (isProduct(s) ? s : null));
+        this.state.loadFrom(d);
+      } else {
+        return false;
+      }
       return true;
     } catch {
       return false;

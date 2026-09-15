@@ -4,12 +4,16 @@ export class Joystick {
   x = 0;
   y = 0;
   active = false;
+  /** fires when a drag starts outside the UI (used to leave overview mode) */
+  onBegin: (() => void) | null = null;
 
   private base: HTMLDivElement;
   private knob: HTMLDivElement;
   private originX = 0;
   private originY = 0;
   private touchId: number | null = null;
+  /** set by a pinch; cleared once every finger is lifted */
+  private blocked = false;
   private readonly radius = 52;
 
   constructor() {
@@ -36,6 +40,12 @@ export class Joystick {
     window.addEventListener('mouseup', this.onMouseUp);
   }
 
+  /** stop driving immediately and ignore touches until all fingers are up */
+  cancel(): void {
+    this.finish();
+    this.blocked = true;
+  }
+
   private isUiTarget(t: EventTarget | null): boolean {
     return t instanceof HTMLElement && !!t.closest('.ui');
   }
@@ -48,6 +58,7 @@ export class Joystick {
     this.base.style.left = `${x}px`;
     this.base.style.top = `${y}px`;
     this.knob.style.transform = 'translate(-50%,-50%)';
+    this.onBegin?.();
   }
 
   private track(x: number, y: number): void {
@@ -74,7 +85,11 @@ export class Joystick {
   private onStart = (e: TouchEvent): void => {
     if (this.isUiTarget(e.target)) return;
     e.preventDefault();
-    if (this.touchId !== null) return;
+    if (e.touches.length > 1) {
+      this.cancel();
+      return;
+    }
+    if (this.blocked || this.touchId !== null) return;
     const t = e.changedTouches[0];
     this.touchId = t.identifier;
     this.begin(t.clientX, t.clientY);
@@ -94,6 +109,7 @@ export class Joystick {
     for (const t of Array.from(e.changedTouches)) {
       if (t.identifier === this.touchId) this.finish();
     }
+    if (e.touches.length === 0) this.blocked = false;
   };
 
   private mouseDown = false;

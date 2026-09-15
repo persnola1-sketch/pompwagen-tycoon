@@ -1,0 +1,82 @@
+{
+  "products": [
+    {
+      "id": "water",
+      "name": "Water Bottles",
+      "short": "WATER",
+      "wrap": "#2e7fd6",
+      "accent": "#bfe3ff",
+      "box": "bottles",
+      "loadHeight": 1.05,
+      "buyMin": 30, "buyMax": 36,
+      "sellMin": 64, "sellMax": 72,
+      "demand": 1.0,
+      "unlockShipped": 0
+    },
+    {
+      "id": "soda",
+      "name": "Soft Drinks",
+      "short": "SODA",
+      "wrap": "#d8342b",
+      "accent": "#ffd23f",
+      "box": "cans",
+      "loadHeight": 0.95,
+      "buyMin": 42, "buyMax": 50,
+      "sellMin": 84, "sellMax": 94,
+      "demand": 1.0,
+      "unlockShipped": 0
+    },
+    {
+      "id": "chips",
+      "name": "Chips",
+      "short": "CHIPS",
+      "wrap": "#f0b020",
+      "accent": "#e2561d",
+      "box": "cartons",
+      "loadHeight": 1.3,
+      "buyMin": 26, "buyMax": 32,
+      "sellMin": 62, "sellMax": 70,
+      "demand": 0.9,
+      "unlockShipped": 8
+    },
+    {
+      "id": "toiletPaper",
+      "name": "Toilet Paper",
+      "short": "TOILET PAPER",
+      "wrap": "#eef1f4",
+      "accent": "#7fb4e6",
+      "box": "rolls",
+      "loadHeight": 1.4,
+      "buyMin": 22, "buyMax": 28,
+      "sellMin": 56, "sellMax": 64,
+      "demand": 0.8,
+      "unlockShipped": 20
+    },
+    {
+      "id": "cannedFood",
+      "name": "Canned Food",
+      "short": "CANNED FOOD",
+      "wrap": "#7b8794",
+      "accent": "#c0392b",
+      "box": "tins",
+      "loadHeight": 0.85,
+      "buyMin": 64, "buyMax": 74,
+      "sellMin": 116, "sellMax": 130,
+      "demand": 0.75,
+      "unlockShipped": 40
+    },
+    {
+      "id": "cleaning",
+      "name": "Cleaning Products",
+      "short": "CLEANING",
+      "wrap": "#1fa88f",
+      "accent": "#f5f06a",
+      "box": "jugs",
+      "loadHeight": 1.1,
+      "buyMin": 54, "buyMax": 62,
+      "sellMin": 104, "sellMax": 116,
+      "demand": 0.75,
+      "unlockShipped": 65
+    }
+  ]
+}

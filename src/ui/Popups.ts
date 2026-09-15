@@ -1,6 +1,7 @@
 import { CustomerOffer, EventBus, SupplierOffer } from '../core/EventBus';
 import { GameState } from '../core/GameState';
-import { Orders } from '../core/Orders';
+import { Orders, customerTotals } from '../core/Orders';
+import { product } from '../core/Products';
 import { Sound } from '../audio/Sound';
 
 function logoColor(name: string): string {
@@ -8,6 +9,16 @@ function logoColor(name: string): string {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return colors[h % colors.length];
+}
+
+function esc(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+}
+
+/** coloured product chip used by cards and the order board */
+export function productChip(id: string): string {
+  const p = product(id);
+  return `<span class="pchip"><i style="background:${p.wrap}"></i>${esc(p.name)}</span>`;
 }
 
 /** Supplier offer and customer order cards with accept/decline and expiry bars. */
@@ -38,16 +49,17 @@ export class Popups {
     const free = this.state.freeSpace;
     const fits = o.pallets <= free;
     const afford = total <= this.state.money;
+    const sell = product(o.product);
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="head">
-        <div class="logo" style="background:${logoColor(o.supplier)}">${o.supplier[0]}</div>
-        <div><div class="title">${o.supplier}</div><div class="sub">Supplier delivery offer</div></div>
+        <div class="logo" style="background:${logoColor(o.supplier)}">${esc(o.supplier[0])}</div>
+        <div><div class="title">${esc(o.supplier)}</div><div class="sub">Supplier delivery offer</div></div>
       </div>
-      <div class="row">${o.pallets} pallets of <b>${o.product}</b></div>
-      <div class="row">${o.free ? '<b class="stock-ok">FREE — first delivery!</b>' : `€${o.pricePerPallet}/pallet · total <b>€${total}</b>`}</div>
-      <div class="row">Free rack space: <span class="${fits ? 'stock-ok' : 'stock-bad'}">${free}${fits ? ' ✔' : ' ✖'}</span></div>
+      <div class="row">${o.pallets} pallets of ${productChip(o.product)}</div>
+      <div class="row">${o.free ? '<b class="stock-ok">FREE — first delivery!</b>' : `€${o.pricePerPallet}/pallet · total <b>€${total}</b> <span class="muted">(sells €${sell.sellMin}–${sell.sellMax})</span>`}</div>
+      <div class="row">Free rack space: <span class="${fits ? 'stock-ok' : 'stock-bad'}">${free}${fits ? ' ✔' : ' ✖'}</span>${afford ? '' : ' · <span class="stock-bad">not enough money</span>'}</div>
       <div class="btns">
         <button class="decline">Decline</button>
         <button class="accept" ${fits && afford ? '' : 'disabled'}>Accept${o.free ? '' : ` €${total}`}</button>
@@ -73,23 +85,28 @@ export class Popups {
 
   private showCustomer(o: CustomerOffer): void {
     this.clearCustomer();
-    const stock = this.state.stock;
-    const ok = stock >= o.pallets;
-    const total = o.pallets * o.pricePerPallet;
-    const profit = Math.round(total - o.pallets * o.costBasisPerPallet);
+    const ok = this.orders.canFill(o);
+    const t = customerTotals(o);
+    const lines = o.lines
+      .map((l) => {
+        const stock = this.state.stockOf(l.product);
+        const has = stock >= l.pallets;
+        return `<div class="row line">${l.pallets}× ${productChip(l.product)} <span class="muted">€${l.pricePerPallet}</span>
+          <span class="${has ? 'stock-ok' : 'stock-bad'} stock">${stock}/${l.pallets} ${has ? '✔' : '✖'}</span></div>`;
+      })
+      .join('');
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="head">
-        <div class="logo" style="background:${logoColor(o.store)}">${o.store[0]}</div>
-        <div><div class="title">${o.store}</div><div class="sub">Customer order</div></div>
+        <div class="logo" style="background:${logoColor(o.store)}">${esc(o.store[0])}</div>
+        <div><div class="title">${esc(o.store)}</div><div class="sub">Customer order${o.lines.length > 1 ? ' · mixed load' : ''}</div></div>
       </div>
-      <div class="row">Wants ${o.pallets} pallets of <b>${o.product}</b></div>
-      <div class="row">€${o.pricePerPallet}/pallet · total <b>€${total}</b> · est. profit <b class="stock-ok">€${profit}</b></div>
-      <div class="row">In stock: <span class="${ok ? 'stock-ok' : 'stock-bad'}">${stock} / needed ${o.pallets} ${ok ? '✔' : '✖'}</span></div>
+      ${lines}
+      <div class="row">Total <b>€${t.revenue}</b> · est. profit <b class="stock-ok">€${t.profit}</b></div>
       <div class="btns">
         <button class="decline">Decline</button>
-        <button class="accept" ${ok ? '' : 'disabled'}>Accept</button>
+        <button class="accept" ${ok ? '' : 'disabled'}>${ok ? 'Accept' : 'Not in stock'}</button>
       </div>
       <div class="timer"><i style="width:100%"></i></div>`;
     card.querySelector('.accept')!.addEventListener('click', () => {

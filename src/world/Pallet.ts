@@ -1,54 +1,47 @@
 import * as THREE from 'three';
-import names from '../config/names.json';
-import { shrinkWrapTexture, woodTexture } from './Textures';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { woodTexture } from './Textures';
+import { loadGeometry, loadMaterials } from './ProductVisuals';
 
-// Shared geometry/materials — pallets are the most numerous object in the game.
+/** height of the pallet deck — loads sit on top of this */
+export const PALLET_TOP = 0.144;
+
 let woodMat: THREE.MeshStandardMaterial | null = null;
-let wrapMat: THREE.MeshStandardMaterial | null = null;
-let slatGeo: THREE.BoxGeometry | null = null;
-let blockGeo: THREE.BoxGeometry | null = null;
-let deckGeo: THREE.BoxGeometry | null = null;
-let loadGeo: THREE.BoxGeometry | null = null;
+let woodGeo: THREE.BufferGeometry | null = null;
 
-/** EUR pallet 1.2 × 0.8 m with a shrink-wrapped product load, origin at floor. */
-export function createPallet(): THREE.Group {
-  if (!woodMat) {
-    woodMat = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9 });
-    wrapMat = new THREE.MeshStandardMaterial({
-      map: shrinkWrapTexture(names.product.color),
-      roughness: 0.35,
-      metalness: 0.05,
-    });
-    slatGeo = new THREE.BoxGeometry(1.2, 0.022, 0.1);
-    blockGeo = new THREE.BoxGeometry(0.1, 0.078, 0.1);
-    deckGeo = new THREE.BoxGeometry(1.2, 0.022, 0.8);
-    loadGeo = new THREE.BoxGeometry(1.1, 0.95, 0.72);
-  }
-  const g = new THREE.Group();
+export function palletWoodMaterial(): THREE.MeshStandardMaterial {
+  if (!woodMat) woodMat = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9 });
+  return woodMat;
+}
 
-  // bottom deck
-  const bottom = new THREE.Mesh(deckGeo!, woodMat);
-  bottom.position.y = 0.011;
-  g.add(bottom);
-  // blocks
+/** EUR pallet 1.2 × 0.8 m (bottom boards, 9 blocks, stringers, top boards) as ONE geometry */
+export function palletWoodGeometry(): THREE.BufferGeometry {
+  if (woodGeo) return woodGeo;
+  const parts: THREE.BufferGeometry[] = [];
+  const add = (w: number, h: number, d: number, x: number, y: number, z: number): void => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(x, y, z);
+    parts.push(g);
+  };
+  for (const z of [-0.35, 0, 0.35]) add(1.2, 0.022, 0.1, 0, 0.011, z); // bottom boards
   for (const x of [-0.55, 0, 0.55]) {
-    for (const z of [-0.35, 0, 0.35]) {
-      const b = new THREE.Mesh(blockGeo!, woodMat);
-      b.position.set(x, 0.061, z);
-      g.add(b);
-    }
+    for (const z of [-0.35, 0, 0.35]) add(0.14, 0.078, 0.1, x, 0.061, z); // blocks
+    add(0.14, 0.022, 0.8, x, 0.111, 0); // stringer boards
   }
-  // top slats
-  for (const z of [-0.35, -0.117, 0.117, 0.35]) {
-    const s = new THREE.Mesh(slatGeo!, woodMat);
-    s.position.set(0, 0.111, z);
-    s.castShadow = true;
-    g.add(s);
-  }
-  // shrink-wrapped load
-  const load = new THREE.Mesh(loadGeo!, wrapMat!);
-  load.position.y = 0.122 + 0.475;
+  for (const z of [-0.35, -0.175, 0, 0.175, 0.35]) add(1.2, 0.022, 0.1, 0, 0.133, z); // top boards
+  woodGeo = mergeGeometries(parts, false)!;
+  for (const p of parts) p.dispose();
+  return woodGeo;
+}
+
+/** pallet with a product load, origin at floor; 2 draw calls (wood + load) */
+export function createPallet(productId: string): THREE.Group {
+  const g = new THREE.Group();
+  const wood = new THREE.Mesh(palletWoodGeometry(), palletWoodMaterial());
+  wood.castShadow = true;
+  const load = new THREE.Mesh(loadGeometry(productId, PALLET_TOP), loadMaterials(productId));
   load.castShadow = true;
-  g.add(load);
+  g.add(wood, load);
+  g.userData.product = productId;
   return g;
 }
