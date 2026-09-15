@@ -6,6 +6,10 @@ export class Joystick {
   active = false;
   /** fires when a drag starts outside the UI (used to leave overview mode) */
   onBegin: (() => void) | null = null;
+  /** short touch/click without dragging (world taps: workers, objects) */
+  onTap: ((x: number, y: number) => void) | null = null;
+  private beganAt = 0;
+  private moved = 0;
 
   private base: HTMLDivElement;
   private knob: HTMLDivElement;
@@ -58,12 +62,15 @@ export class Joystick {
     this.base.style.left = `${x}px`;
     this.base.style.top = `${y}px`;
     this.knob.style.transform = 'translate(-50%,-50%)';
+    this.beganAt = performance.now();
+    this.moved = 0;
     this.onBegin?.();
   }
 
   private track(x: number, y: number): void {
     let dx = x - this.originX;
     let dy = y - this.originY;
+    this.moved = Math.max(this.moved, Math.hypot(dx, dy));
     const len = Math.hypot(dx, dy);
     if (len > this.radius) {
       dx = (dx / len) * this.radius;
@@ -75,6 +82,7 @@ export class Joystick {
   }
 
   private finish(): void {
+    if (this.active && performance.now() - this.beganAt < 280 && this.moved < 10) this.onTap?.(this.originX, this.originY);
     this.active = false;
     this.x = 0;
     this.y = 0;

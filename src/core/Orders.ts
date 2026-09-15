@@ -3,6 +3,7 @@ import names from '../config/names.json';
 import { CustomerOffer, EventBus, OrderLine, SupplierOffer, TruckKind } from './EventBus';
 import { GameState } from './GameState';
 import { PRODUCTS, ProductDef, product } from './Products';
+import { ClerkRules } from './workers/WorkerTypes';
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -66,6 +67,11 @@ export class Orders {
   private supplierTimer: number = economy.supplier.firstOfferDelay;
   private customerTimer: number = economy.customer.firstOfferDelay;
   private avgCost: Record<string, number> = {};
+  /** office clerk auto-decisions (null = no clerk) */
+  clerk: ClerkRules | null = null;
+  clerkDelay = 2.5;
+  private clerkTimerS = 0;
+  private clerkTimerC = 0;
 
   constructor(private state: GameState, private bus: EventBus) {
     for (const p of PRODUCTS) this.avgCost[p.id] = (p.buyMin + p.buyMax) / 2;
@@ -94,6 +100,8 @@ export class Orders {
       }
     }
 
+    this.updateClerk(dt);
+
     if (this.pendingSupplier) {
       this.pendingSupplier.expiresIn -= dt;
       if (this.pendingSupplier.expiresIn <= 0) {
@@ -118,6 +126,39 @@ export class Orders {
       c.deadline -= dt;
       if (c.deadline <= 0) this.missCustomerOrder();
     }
+  }
+
+  /** the office clerk answers popups by the player's rules after a short delay */
+  private updateClerk(dt: number): void {
+    const r = this.clerk;
+    if (!r || !this.auto) {
+      this.clerkTimerS = this.clerkTimerC = 0;
+      return;
+    }
+    const s = this.pendingSupplier;
+    if (s && r.autoBuy) {
+      this.clerkTimerS += dt;
+      if (this.clerkTimerS >= this.clerkDelay) {
+        this.clerkTimerS = 0;
+        const cost = s.pallets * s.pricePerPallet;
+        const ok = this.state.stockOf(s.product) < r.buyIfStockBelow && cost <= r.maxSpendPerOffer && cost <= this.state.money && s.pallets <= this.state.freeSpace;
+        const name = product(s.product).name;
+        if (ok) this.acceptSupplier(s.id);
+        else this.declineSupplier(s.id);
+        this.bus.emit('clerkDecided', { kind: 'supplier', accepted: ok, text: ok ? `Clerk accepted ${s.pallets}× ${name} for €${cost}` : `Clerk declined ${name} delivery` });
+      }
+    } else this.clerkTimerS = 0;
+    const c = this.pendingCustomer;
+    if (c && r.autoSell) {
+      this.clerkTimerC += dt;
+      if (this.clerkTimerC >= this.clerkDelay) {
+        this.clerkTimerC = 0;
+        const ok = this.canFill(c);
+        if (ok) this.acceptCustomer(c.id);
+        else this.declineCustomer(c.id);
+        this.bus.emit('clerkDecided', { kind: 'customer', accepted: ok, text: ok ? `Clerk accepted ${c.store}'s order` : `Clerk declined ${c.store} (not in stock)` });
+      }
+    } else this.clerkTimerC = 0;
   }
 
   // ---------- generation ----------
@@ -331,6 +372,7 @@ export class Orders {
     const o = this.activeSupplier;
     if (!o || o.state !== 'docked' || o.remaining <= 0) return null;
     o.remaining--;
+    this.state.stats.unloaded++;
     this.bus.emit('palletPicked', { from: 'truck', product: o.product });
     if (o.remaining <= 0) {
       o.state = 'done';
@@ -366,6 +408,7 @@ export class Orders {
     }
     if (revenue > 0) this.state.addMoney(revenue);
     this.state.addShipped(loaded);
+    this.state.stats.ordersDone++;
     return { revenue, profit: Math.round(profit) };
   }
 
@@ -375,6 +418,7 @@ export class Orders {
     o.state = 'done';
     const fast = o.deadline > o.deadlineTotal * economy.customer.fastDeliveryFraction;
     const { revenue, profit } = this.settle(o);
+    this.state.stats.ordersOnTime++;
     if (fast) this.state.addReputation(economy.customer.fastDeliveryRepBonus);
     this.bus.emit('orderShipped', { orderId: o.id, revenue, profit, fast });
     this.bus.emit('truckLeaving', { kind: 'customer', orderId: o.id });

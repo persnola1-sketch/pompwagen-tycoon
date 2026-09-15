@@ -1,8 +1,14 @@
 import layout from '../config/layout.json';
-import { GameState, SAVE_VERSION, SaveData, TOTAL_SLOTS } from './GameState';
+import { EMPTY_STATS, GameState, SAVE_VERSION, SaveData, TOTAL_SLOTS } from './GameState';
 import { PRODUCTS, isProduct } from './Products';
 
 const KEY = 'pompwagen-tycoon-save';
+
+/** a game system that persists its own slice of the save file */
+export interface Saveable<T = unknown> {
+  toSave(): T;
+  loadFrom(data: T | undefined): void;
+}
 
 /** v1 saves had a single product and boolean slot occupancy in a different rack layout */
 function migrateV1(raw: Record<string, unknown>): SaveData {
@@ -23,16 +29,33 @@ function migrateV1(raw: Record<string, unknown>): SaveData {
     tutorialDone: !!raw.tutorialDone,
     warehouseBuilt: true,
     padProgress: {},
-    stats: (raw.stats as SaveData['stats']) ?? { shipped: 0, earned: 0, spent: 0 },
+    stats: { ...EMPTY_STATS, ...((raw.stats as Partial<SaveData['stats']>) ?? {}) },
   };
 }
 
+/**
+ * Versioned localStorage save. The core GameState is always saved; other
+ * systems register themselves under a key and get their slice back on load
+ * (registration restores immediately if a save was already read).
+ */
 export class SaveSystem {
+  private modules = new Map<string, Saveable>();
+  private loaded: Record<string, unknown> | null = null;
+  /** wall-clock time of the last save (for offline shifts) */
+  lastSeen = 0;
+
   constructor(private state: GameState) {}
+
+  register<T>(key: string, mod: Saveable<T>): void {
+    this.modules.set(key, mod as Saveable);
+    if (this.loaded && key in this.loaded) mod.loadFrom(this.loaded[key] as T);
+  }
 
   save(): void {
     try {
-      localStorage.setItem(KEY, JSON.stringify(this.state.toSave()));
+      const data: Record<string, unknown> = { ...this.state.toSave(), savedAt: Date.now() };
+      for (const [k, m] of this.modules) data[k] = m.toSave();
+      localStorage.setItem(KEY, JSON.stringify(data));
     } catch {
       /* private mode / quota — ignore */
     }
@@ -54,6 +77,9 @@ export class SaveSystem {
       } else {
         return false;
       }
+      this.loaded = data;
+      this.lastSeen = Number(data.savedAt) || 0;
+      for (const [k, m] of this.modules) if (k in data) m.loadFrom(data[k]);
       return true;
     } catch {
       return false;

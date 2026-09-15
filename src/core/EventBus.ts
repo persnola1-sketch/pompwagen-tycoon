@@ -34,7 +34,13 @@ export type GameEvents = {
   guideHide: Record<string, never>;
   guideContinue: Record<string, never>;
   workerHired: { workerId: number };
-  toast: { text: string; kind: 'good' | 'bad' | 'info' };
+  workerLeft: { workerId: number };
+  workersChanged: Record<string, never>;
+  workerLevelUp: { workerId: number; level: number };
+  workerAction: { workerId: number; action: 'unload' | 'store' | 'pick' | 'load' | 'drop'; product: string; x: number; z: number };
+  palletDropped: { workerId: number; product: string };
+  clerkDecided: { kind: TruckKind; accepted: boolean; text: string };
+  toast: { text: string; kind: 'good' | 'bad' | 'info' | 'unlock' };
   ordersChanged: Record<string, never>;
 };
 

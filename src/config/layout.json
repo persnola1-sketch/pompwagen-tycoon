@@ -32,6 +32,7 @@
     "radius": 1.15
   },
   "playerStart": { "x": 0, "z": 7 },
+  "breakSpot": { "x": -4, "z": 10.2 },
   "plot": {
     "pad": { "x": 0, "z": 2 },
     "playerStart": { "x": 0, "z": 9 },

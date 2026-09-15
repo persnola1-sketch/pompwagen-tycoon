@@ -7,6 +7,7 @@ import { Orders } from '../core/Orders';
 import { Pads } from '../world/Pads';
 import { Player } from '../world/Player';
 import { Racks, inRowStrip, slotPosition } from '../world/Racks';
+import { FallenPallets } from '../world/workers/FallenPallets';
 
 const PER_ROW = layout.rackRows.slotsPerRow;
 
@@ -21,6 +22,7 @@ export class Interactions {
 
   /** off while the warehouse is not built or during cutscenes */
   enabled = true;
+  fallen: FallenPallets | null = null;
   private cooldown = 0;
   private officeLatch = false;
 
@@ -50,6 +52,7 @@ export class Interactions {
 
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.cooldown > 0) return;
+    if (this.tryPickFallen(px, pz)) return;
     if (this.tryUnload(px, pz) || this.tryLoad(px, pz)) return;
     for (let row = 0; row < this.state.rackRows; row++) {
       if (!inRowStrip(row, px, pz)) continue;
@@ -60,6 +63,18 @@ export class Interactions {
   private done(): void {
     this.cooldown = economy.interaction.actionCooldown;
     this.onCargoChanged?.();
+  }
+
+  /** only the boss can pick up pallets dropped by workers */
+  private tryPickFallen(px: number, pz: number): boolean {
+    if (!this.fallen || this.player.carrying >= this.player.capacity) return false;
+    const pid = this.fallen.pickNear(px, pz, 1.1);
+    if (!pid) return false;
+    this.player.setCargo([...this.player.cargo, pid]);
+    this.sound.palletUp();
+    this.bus.emit('palletPicked', { from: 'rack', product: pid });
+    this.done();
+    return true;
   }
 
   private tryUnload(px: number, pz: number): boolean {

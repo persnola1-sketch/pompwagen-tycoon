@@ -10,7 +10,14 @@ export interface Stats {
   shipped: number;
   earned: number;
   spent: number;
+  /** pallets moved by workers */
+  workerMoved: number;
+  ordersDone: number;
+  ordersOnTime: number;
+  unloaded: number;
 }
+
+export const EMPTY_STATS: Stats = { shipped: 0, earned: 0, spent: 0, workerMoved: 0, ordersDone: 0, ordersOnTime: 0, unloaded: 0 };
 
 export interface Settings {
   henkTips: boolean;
@@ -34,6 +41,7 @@ export interface SaveData {
   tutorialDone: boolean;
   /** false on a fresh game: the player starts on an empty plot */
   warehouseBuilt: boolean;
+  forklift?: boolean;
   padProgress: Record<string, number>;
   stats: Stats;
 }
@@ -50,7 +58,8 @@ export class GameState {
   settings: Settings = { ...DEFAULT_SETTINGS };
   tipsSeen: string[] = [];
   padProgress: Record<string, number> = {};
-  stats: Stats = { shipped: 0, earned: 0, spent: 0 };
+  forklift = false;
+  stats: Stats = { ...EMPTY_STATS };
 
   constructor(private bus: EventBus) {}
 
@@ -124,6 +133,7 @@ export class GameState {
       speedLevel: this.speedLevel,
       tutorialDone: this.tutorialDone,
       warehouseBuilt: this.warehouseBuilt,
+      forklift: this.forklift,
       settings: { ...this.settings },
       tipsSeen: [...this.tipsSeen],
       padProgress: { ...this.padProgress },
@@ -144,6 +154,7 @@ export class GameState {
     this.settings = { ...DEFAULT_SETTINGS, ...(d.settings ?? {}) };
     this.tipsSeen = d.tipsSeen ?? [];
     this.padProgress = d.padProgress ?? {};
-    this.stats = d.stats ?? { shipped: 0, earned: 0, spent: 0 };
+    this.stats = { ...EMPTY_STATS, ...(d.stats ?? {}) };
+    this.forklift = d.forklift ?? false;
   }
 }

@@ -33,6 +33,13 @@ import { Confetti } from './ui/Confetti';
 import { Interactions } from './game/Interactions';
 import { PayPads } from './game/PayPads';
 import { DevPanel } from './debug/DevPanel';
+import { Workers } from './core/workers/Workers';
+import { simulateOfflineShift } from './core/workers/Offline';
+import { WorkerAI } from './game/WorkerAI';
+import { FallenPallets } from './world/workers/FallenPallets';
+import { WorkersPanel } from './ui/WorkersPanel';
+import { ShiftReportUi } from './ui/ShiftReport';
+import { roleDef } from './core/workers/WorkerTypes';
 
 class Game {
   private bus = new EventBus();
@@ -40,6 +47,11 @@ class Game {
   private save = new SaveSystem(this.state);
   private orders = new Orders(this.state, this.bus);
   private tutorial = new Tutorial(this.state, this.orders, this.bus);
+  private workers = new Workers(this.state, this.bus);
+  private workerAI: WorkerAI;
+  private fallen: FallenPallets;
+  private workersPanel: WorkersPanel;
+  private shiftReport = new ShiftReportUi();
   private sound = new Sound();
 
   private root: SceneRoot;
@@ -75,7 +87,9 @@ class Game {
   private lastTime = performance.now();
 
   constructor() {
+    this.save.register('workers', this.workers);
     this.save.load();
+    this.tutorial.hasWorkers = true;
 
     this.root = new SceneRoot(document.getElementById('app')!);
     initAssets(this.root.renderer);
@@ -93,6 +107,7 @@ class Game {
 
     this.effects = new Effects(scene);
     this.henk = new Henk(scene);
+    this.fallen = new FallenPallets(scene);
     scene.add(this.pads.group);
 
     this.supplierTruck = new Truck('supplier', scene);
@@ -114,7 +129,21 @@ class Game {
     this.pads.create('office', p.office.x, p.office.z, ['OFFICE', 'orders'], '#e8eaf0', { size: 1.8, icon: '🗂️' });
 
     this.interactions = new Interactions(this.state, this.orders, this.bus, this.pads, this.player, this.racks, this.sound);
+    this.interactions.fallen = this.fallen;
     this.interactions.onCargoChanged = (): void => this.updateTrucks();
+    this.workerAI = new WorkerAI(this.state, this.orders, this.workers, this.bus, this.racks, this.fallen, this.warehouse.colliders, scene);
+    this.workerAI.sync();
+    this.workersPanel = new WorkersPanel(this.workers, this.state, this.bus);
+    this.workersPanel.onClose = (): void => this.sound.click();
+    this.workersPanel.onAction = (): void => {
+      this.sound.click();
+      this.save.save();
+    };
+    this.hud.onWorkersToggle = (): void => {
+      this.sound.click();
+      this.workersPanel.toggle();
+    };
+    this.wireWorkers();
     this.interactions.onOffice = (): void => {
       this.board.toggle();
       this.sound.click();
@@ -130,6 +159,7 @@ class Game {
     if (!built) this.player.teleport(layout.plot.playerStart.x, layout.plot.playerStart.z);
     if (this.state.tutorialDone) this.orders.startAuto();
     else this.tutorial.start();
+    this.offlineShift();
 
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.save.save();
@@ -153,6 +183,8 @@ class Game {
       tutorialDone: this.state.tutorialDone,
       player: [Math.round(this.player.x * 10) / 10, Math.round(this.player.z * 10) / 10],
       building: !!this.build,
+      workers: this.workers.workers.map((w) => `${w.name}:${roleDef(w.role).id}:L${w.level}:${w.stats.moved}`),
+      stock: this.state.stock,
       calls: this.root.renderer.info.render.calls,
     };
   }
@@ -205,6 +237,81 @@ class Game {
     this.bus.emit('warehouseBuilt', {});
     if (this.state.tutorialDone) this.orders.startAuto();
     this.save.save();
+  }
+
+  private wireWorkers(): void {
+    this.bus.on('workerHired', ({ workerId }) => {
+      this.sound.fanfare();
+      this.tutorial.tip('firstWorker');
+      const w = this.workers.byId(workerId);
+      if (w?.role === 'clerk') this.orders.clerk = this.workers.clerkRules;
+      this.save.save();
+    });
+    this.bus.on('workersChanged', () => {
+      this.orders.clerk = this.workers.hasRole('clerk') ? this.workers.clerkRules : null;
+      this.hud.setWorkerCount(this.workers.count);
+    });
+    this.orders.clerk = this.workers.hasRole('clerk') ? this.workers.clerkRules : null;
+    this.hud.setWorkerCount(this.workers.count);
+    this.bus.on('workerLevelUp', ({ workerId, level }) => {
+      const w = this.workers.byId(workerId);
+      if (!w) return;
+      this.sound.fanfare();
+      this.confetti.burst(60, 0.5);
+      this.bus.emit('toast', { text: `🎉 ${w.name} reached level ${level}!`, kind: 'unlock' });
+    });
+    this.bus.on('workerAction', ({ action }) => {
+      if (action === 'store' || action === 'load') this.sound.palletDown();
+      else if (action === 'drop') this.sound.thud();
+      else this.sound.palletUp();
+      this.updateTrucks();
+    });
+    this.bus.on('palletDropped', ({ workerId }) => {
+      const w = this.workers.byId(workerId);
+      this.bus.emit('toast', { text: `💥 ${w?.name.split(' ')[0] ?? 'A worker'} dropped a pallet! Pick it up, boss.`, kind: 'bad' });
+    });
+    this.bus.on('clerkDecided', ({ text, accepted }) => {
+      this.bus.emit('toast', { text: `🖥️ ${text}`, kind: accepted ? 'good' : 'info' });
+      if (accepted) this.sound.accept();
+    });
+    // tap a worker to see their card
+    this.joystick.onTap = (sx, sy): void => {
+      if (!this.state.warehouseBuilt) return;
+      const w = this.workerAtScreen(sx, sy);
+      if (w) {
+        this.sound.click();
+        this.workersPanel.open('team');
+      }
+    };
+  }
+
+  /** raycast a screen tap onto the floor and find a worker near the hit */
+  private workerAtScreen(sx: number, sy: number): ReturnType<WorkerAI['agentAt']> {
+    const ndc = new THREE.Vector2((sx / window.innerWidth) * 2 - 1, -(sy / window.innerHeight) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.root.camera);
+    const hit = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.9), hit)) return null;
+    return this.workerAI.agentAt(hit, 1.2);
+  }
+
+  /** night shift earnings since the last save */
+  private offlineShift(): void {
+    if (!this.save.lastSeen || !this.state.tutorialDone) return;
+    const report = simulateOfflineShift(this.state, this.workers, Date.now() - this.save.lastSeen);
+    if (!report) return;
+    this.shiftReport.onClose = (): void => {
+      this.sound.chaChing();
+      this.save.save();
+    };
+    this.shiftReport.onDouble = (r): void => {
+      // ad-based doubling arrives with the AdService (phase 12); for now just collect
+      this.state.addMoney(Math.max(0, r.earned - r.wages));
+      this.sound.chaChing();
+      this.save.save();
+    };
+    this.shiftReport.show(report);
+    this.bus.emit('workersChanged', {});
   }
 
   // ---------- setup ----------
@@ -367,6 +474,10 @@ class Game {
     this.popups.update();
     this.interactions.update(dt);
     this.payPads.update(dt);
+    if (this.state.warehouseBuilt && !this.build) {
+      this.workers.update(dt, this.state.forklift);
+      this.workerAI.update(dt, this.player, this.warehouse.colliders);
+    }
     this.dev.frame(dt);
 
     if (this.build) {
@@ -393,6 +504,7 @@ class Game {
     if (this.boardTick >= 1) {
       this.boardTick = 0;
       this.board.tick();
+      this.workersPanel.tick();
     }
 
     this.saveTimer += dt;

@@ -17,12 +17,8 @@ import {
   textSprite,
 } from './Textures';
 
-export interface AABB {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-}
+import { AABB } from '../core/Geometry';
+export type { AABB };
 
 const W = layout.warehouse.width;
 const D = layout.warehouse.depth;
