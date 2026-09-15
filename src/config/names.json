@@ -1,0 +1,5 @@
+{
+  "product": { "id": "water", "name": "Water Bottles", "color": "#2e7fd6" },
+  "suppliers": ["AquaPure", "BronWater BV", "Helder Springs", "BlueDrop Co", "Vitalis Water"],
+  "stores": ["FreshMart", "SuperDeal", "Buurt Markt", "QuickShop", "MegaVoordeel", "Spar & Go"]
+}

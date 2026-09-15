@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Warehouse Tycoon</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body {
+    width:100%; height:100dvh; overflow:hidden; background:#1a2233;
+    touch-action:none; overscroll-behavior:none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select:none; -webkit-user-select:none;
+  }
+  #game { position:fixed; inset:0; width:100%; height:100dvh; display:block; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position:fixed; inset:0; pointer-events:none;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #topbar {
+    position:absolute; top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left:0; right:0; display:flex; justify-content:center; gap:8px; flex-wrap:wrap;
+    padding:0 12px;
+  }
+  .chip {
+    background:rgba(20,28,45,.82); color:#fff; border-radius:999px;
+    padding:8px 16px; font-weight:800; font-size:17px;
+    box-shadow:0 4px 14px rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    transition: transform .15s;
+  }
+  #money { color:#ffd94d; min-width:92px; text-align:center; }
+  #money.bump { animation: bump .35s ease; }
+  @keyframes bump { 0%{transform:scale(1)} 40%{transform:scale(1.25)} 100%{transform:scale(1)} }
+  #orders { color:#8ef0a5; }
+  #stock  { color:#8ecdf0; }
+
+  /* ---------- tutorial bubble ---------- */
+  #bubble {
+    position:absolute; left:50%; transform:translateX(-50%) scale(0);
+    top: calc(env(safe-area-inset-top, 0px) + 62px);
+    max-width:min(88vw, 420px);
+    background:#fff; color:#233; border-radius:18px; padding:12px 18px;
+    font-size:17px; font-weight:700; text-align:center; line-height:1.35;
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  #bubble.show { transform:translateX(-50%) scale(1); }
+  #bubble::after {
+    content:""; position:absolute; left:50%; top:-8px; transform:translateX(-50%) rotate(45deg);
+    width:16px; height:16px; background:#fff;
+  }
+
+  /* ---------- upgrade panel ---------- */
+  #panel {
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    display:flex; gap:10px; pointer-events:auto; padding:0 10px;
+  }
+  .btn {
+    border:none; border-radius:16px; padding:11px 16px; font-size:15px; font-weight:800;
+    color:#fff; cursor:pointer; box-shadow:0 5px 0 rgba(0,0,0,.28);
+    display:flex; flex-direction:column; align-items:center; gap:2px; line-height:1.2;
+    transition: transform .1s, filter .2s; font-family:inherit;
+  }
+  .btn:active { transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.28); }
+  .btn small { font-weight:700; opacity:.9; font-size:13px; }
+  #btnUpgrade { background:linear-gradient(180deg,#ff9f43,#f2711c); }
+  #btnUpgrade.cant { filter:grayscale(.55) brightness(.75); }
+  #btnUpgrade.attention { animation:attn 1s ease infinite; }
+  @keyframes attn { 0%,100%{transform:scale(1)} 50%{transform:scale(1.09)} }
+  #btnElectric { background:linear-gradient(180deg,#5a6a85,#3d4a61); filter:grayscale(.3); cursor:default; }
+  #btnElectric small { opacity:.75; }
+
+  /* ---------- joystick ---------- */
+  #joy { position:fixed; width:120px; height:120px; border-radius:50%;
+    background:rgba(255,255,255,.10); border:2px solid rgba(255,255,255,.25);
+    display:none; pointer-events:none; z-index:5; }
+  #joyKnob { position:absolute; left:50%; top:50%; width:52px; height:52px; border-radius:50%;
+    background:rgba(255,255,255,.55); transform:translate(-50%,-50%);
+    box-shadow:0 2px 10px rgba(0,0,0,.3); }
+
+  /* ---------- money popup ---------- */
+  .pop {
+    position:fixed; color:#ffd94d; font-size:28px; font-weight:900; pointer-events:none;
+    text-shadow:0 2px 6px rgba(0,0,0,.5), 0 0 2px #7a5b00; z-index:6;
+    animation:popfly 1.15s ease-out forwards;
+  }
+  @keyframes popfly {
+    0% { transform:translate(-50%,0) scale(.4); opacity:0; }
+    18%{ transform:translate(-50%,-14px) scale(1.25); opacity:1; }
+    100%{ transform:translate(-50%,-90px) scale(1); opacity:0; }
+  }
+  #hint {
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+    color:rgba(255,255,255,.55); font-size:13px; font-weight:600; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <div id="topbar">
+    <div class="chip" id="money">€0</div>
+    <div class="chip" id="stock">🗄️ 0</div>
+    <div class="chip" id="orders" style="display:none">📦 Order!</div>
+  </div>
+  <div id="bubble"></div>
+  <div id="hint"></div>
+  <div id="panel">
+    <button class="btn" id="btnUpgrade">⚡ Faster Pompwagen<small id="upCost">€5 · Lv 1</small></button>
+    <button class="btn" id="btnElectric">🔋 Electric Pompwagen<small>Coming soon 🔒</small></button>
+  </div>
+</div>
+<div id="joy"><div id="joyKnob"></div></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ============================ setup ============================ */
+const canvas = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x28324a);
+scene.fog = new THREE.Fog(0x28324a, 38, 62);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 120);
+function sizeView(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.fov = camera.aspect < 1 ? 62 : 50;   // wider fov in portrait
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', sizeView);
+window.addEventListener('orientationchange', () => setTimeout(sizeView, 250));
+sizeView();
+
+/* lighting */
+scene.add(new THREE.AmbientLight(0xbfd4ff, 0.75));
+const sun = new THREE.DirectionalLight(0xfff2dd, 1.35);
+sun.position.set(10, 20, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.left = -20; sun.shadow.camera.right = 20;
+sun.shadow.camera.top = 20;  sun.shadow.camera.bottom = -22;
+sun.shadow.camera.far = 60;
+sun.shadow.bias = -0.0015;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x88aaff, 0.35);
+fill.position.set(-8, 12, -6);
+scene.add(fill);
+
+/* ============================ helpers ============================ */
+const mat = (color, opts={}) => new THREE.MeshLambertMaterial({ color, ...opts });
+function box(w, h, d, color, x=0, y=0, z=0, shadow=true){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.position.set(x, y, z);
+  if (shadow){ m.castShadow = true; m.receiveShadow = true; }
+  return m;
+}
+const colliders = [];   // {minX,maxX,minZ,maxZ}
+function addCollider(cx, cz, w, d, pad=0){
+  colliders.push({ minX:cx-w/2-pad, maxX:cx+w/2+pad, minZ:cz-d/2-pad, maxZ:cz+d/2+pad });
+}
+
+/* ============================ warehouse ============================ */
+const FLOOR_W = 22, FLOOR_D = 30;
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(FLOOR_W, FLOOR_D), mat(0x9aa3ad));
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+/* floor lane markings */
+function paintStrip(x, z, w, d, color, y=0.012){
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat(color));
+  s.rotation.x = -Math.PI/2; s.position.set(x, y, z); s.receiveShadow = true;
+  scene.add(s); return s;
+}
+paintStrip(0, -1, 3.2, 22, 0xa8b2bd);                 // main aisle
+paintStrip(0, -12.7, 5.5, 3.4, 0xd9a441);             // inbound area
+paintStrip(0, 12.2, 5.5, 3.6, 0x64b96a);              // shipping area
+for (let z=-9; z<=9; z+=3) paintStrip(-1.8, z, .18, 1.6, 0xf2e14c), paintStrip(1.8, z, .18, 1.6, 0xf2e14c);
+
+/* walls */
+const WALL_H = 2.6, WALL_COL = 0xd7dde6, T = 0.6;
+const walls = [
+  box(FLOOR_W+T, WALL_H, T, WALL_COL, 0, WALL_H/2, -FLOOR_D/2),      // back (truck side)
+  box(FLOOR_W+T, WALL_H, T, WALL_COL, 0, WALL_H/2,  FLOOR_D/2),      // front
+  box(T, WALL_H, FLOOR_D, WALL_COL, -FLOOR_W/2, WALL_H/2, 0),
+  box(T, WALL_H, FLOOR_D, WALL_COL,  FLOOR_W/2, WALL_H/2, 0),
+];
+walls.forEach(w => scene.add(w));
+addCollider(0, -FLOOR_D/2, FLOOR_W+2, T);
+addCollider(0,  FLOOR_D/2, FLOOR_W+2, T);
+addCollider(-FLOOR_W/2, 0, T, FLOOR_D+2);
+addCollider( FLOOR_W/2, 0, T, FLOOR_D+2);
+
+/* dock doors painted on walls */
+function dockDoor(x, z, ry, color){
+  const d = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.1), mat(color));
+  d.position.set(x, 1.15, z); d.rotation.y = ry; scene.add(d);
+  for (let i=0;i<4;i++){
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.06), mat(0x223047));
+    line.position.set(x, 0.45+i*0.5, z + (ry===0? 0.012 : -0.012)); line.rotation.y = ry;
+    scene.add(line);
+  }
+}
+dockDoor(0, -FLOOR_D/2 + T/2 + 0.02, 0, 0x5f83b8);          // inbound door
+dockDoor(0,  FLOOR_D/2 - T/2 - 0.02, Math.PI, 0x5fb87a);    // shipping door
+
+/* truck (outside, visible over the low back wall) */
+const truck = new THREE.Group();
+{
+  const trailer = box(3.4, 2.6, 6.5, 0xffffff, 0, 1.7, 0);
+  const stripe  = box(3.42, 0.5, 6.52, 0xf2711c, 0, 2.2, 0);
+  const cab     = box(3.0, 1.9, 2.0, 0x3d84e0, 0, 1.15, -4.4);
+  const cabTop  = box(2.8, 0.9, 1.1, 0x62a4f0, 0, 2.4, -4.0);
+  truck.add(trailer, stripe, cab, cabTop);
+  const wmat = mat(0x222831);
+  [[-1.6,-3.9],[1.6,-3.9],[-1.6,1.6],[1.6,1.6],[-1.6,2.9],[1.6,2.9]].forEach(([x,z])=>{
+    const wl = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,0.35,14), wmat);
+    wl.rotation.z = Math.PI/2; wl.position.set(x, 0.55, z); wl.castShadow = true;
+    truck.add(wl);
+  });
+}
+truck.position.set(0, 0, -FLOOR_D/2 - 3.9);
+scene.add(truck);
+
+/* storage racks */
+function makeRack(x, z, len){
+  const g = new THREE.Group();
+  const post = 0x3d84e0, beam = 0xf2711c;
+  for (const dz of [-len/2, len/2]) for (const dx of [-0.55, 0.55])
+    g.add(box(0.14, 2.6, 0.14, post, dx, 1.3, dz));
+  for (const y of [0.9, 1.9]) for (const dx of [-0.55, 0.55])
+    g.add(box(0.1, 0.12, len, beam, dx, y, 0));
+  for (const y of [0.96, 1.96])
+    g.add(box(1.15, 0.05, len, 0xc8935a, 0, y, 0));
+  g.position.set(x, 0, z);
+  scene.add(g);
+  addCollider(x, z, 1.5, len + 0.3);
+  return g;
+}
+const rackA = makeRack(8.6, -3.2, 5);
+const rackB = makeRack(8.6,  3.2, 5);
+makeRack(-8.6, -3.2, 5);
+makeRack(-8.6,  3.2, 5);
+
+/* crates that appear on racks as stock grows */
+const stockBoxes = [];
+{
+  const spots = [];
+  for (const rack of [rackA, rackB])
+    for (const y of [1.25, 2.25])
+      for (const dz of [-1.7, 0, 1.7])
+        spots.push({ rack, y, dz });
+  const cols = [0xe8c05a, 0x7ec8e3, 0xe38b7e, 0x9fd68a];
+  spots.forEach((s, i) => {
+    const b = box(0.85, 0.55, 0.9, cols[i % cols.length], 0, s.y, s.dz);
+    b.visible = false; s.rack.add(b); stockBoxes.push(b);
+  });
+}
+
+/* decorative clutter (left racks get static boxes) */
+{
+  const cols = [0xe8c05a, 0x7ec8e3, 0x9fd68a];
+  let i = 0;
+  for (const z of [-4.5, -3.2, -1.9, 2.0, 3.4, 4.4]){
+    const b = box(0.85, 0.55, 0.9, cols[i++ % 3], -8.6, 1.25, z);
+    scene.add(b);
+  }
+}
+
+/* waiting pallet stack near the truck door */
+const waitingStack = new THREE.Group();
+scene.add(waitingStack);
+waitingStack.position.set(-2.6, 0, -12.6);
+const waitingPallets = [];
+for (let i=0; i<3; i++){
+  const p = makePalletMesh(true);
+  p.position.y = 0.02 + i*0.42;
+  waitingStack.add(p); waitingPallets.push(p);
+}
+
+/* ============================ zones ============================ */
+function makeZone(x, z, color, radius=1.5){
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.RingGeometry(radius-0.22, radius, 40),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.9, side:THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI/2; ring.position.y = 0.02;
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(radius-0.24, 40),
+    new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.16, side:THREE.DoubleSide }));
+  disc.rotation.x = -Math.PI/2; disc.position.y = 0.018;
+  g.add(ring, disc);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  return { g, ring, disc, x, z, radius, active:true };
+}
+const truckZone = makeZone(0, -12.4, 0xffb340, 1.6);
+const rackZone  = makeZone(6.4, 0,   0x59c2ff, 1.6);
+const shipZone  = makeZone(0, 12.1,  0x5ee87c, 1.6);
+
+/* tutorial arrow */
+const arrow = new THREE.Group();
+{
+  const m = new THREE.MeshBasicMaterial({ color:0xffe14d });
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.8, 16), m);
+  head.rotation.x = Math.PI; head.position.y = 0.4;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.8, 12), m);
+  shaft.position.y = 1.15;
+  arrow.add(head, shaft);
+}
+arrow.visible = false;
+scene.add(arrow);
+
+/* ============================ pallets ============================ */
+function makePalletMesh(withBoxes){
+  const g = new THREE.Group();
+  const wood = 0xc8935a, wood2 = 0xb07f49;
+  for (const dx of [-0.42, 0, 0.42]) g.add(box(0.22, 0.1, 1.05, wood2, dx, 0.05, 0));
+  for (let i=0;i<5;i++) g.add(box(1.1, 0.07, 0.16, wood, 0, 0.135, -0.44 + i*0.22));
+  if (withBoxes){
+    g.add(box(0.5, 0.42, 0.5, 0xe8c05a, -0.24, 0.39, -0.2));
+    g.add(box(0.45, 0.36, 0.45, 0x7ec8e3, 0.24, 0.36, -0.15));
+    g.add(box(0.48, 0.4, 0.48, 0xe38b7e, 0, 0.38, 0.3));
+  }
+  return g;
+}
+
+/* ============================ player + pompwagen ============================ */
+const player = new THREE.Group();
+{
+  const legL = box(0.16, 0.42, 0.18, 0x35415c, -0.11, 0.21, 0);
+  const legR = box(0.16, 0.42, 0.18, 0x35415c,  0.11, 0.21, 0);
+  legL.name = 'legL'; legR.name = 'legR';
+  const torso = box(0.44, 0.5, 0.28, 0x4a90d9, 0, 0.67, 0);
+  const vest  = box(0.5, 0.44, 0.34, 0xff7b1c, 0, 0.68, 0);
+  const strip = box(0.52, 0.09, 0.36, 0xf7ef6a, 0, 0.68, 0);
+  const head  = new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 14), mat(0xf0c8a0));
+  head.position.y = 1.1; head.castShadow = true;
+  const hat = new THREE.Mesh(new THREE.SphereGeometry(0.21, 18, 10, 0, Math.PI*2, 0, Math.PI/2), mat(0xffd23c));
+  hat.position.y = 1.12; hat.castShadow = true;
+  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.045, 18), mat(0xffd23c));
+  brim.position.y = 1.12;
+  const armL = box(0.11, 0.4, 0.13, 0xff7b1c, -0.31, 0.68, 0);
+  const armR = box(0.11, 0.4, 0.13, 0xff7b1c,  0.31, 0.68, 0.1);
+  armR.rotation.x = 0.9; armR.name = 'armR';       // arm reaching back to the handle
+  player.add(legL, legR, torso, vest, strip, head, hat, brim, armL, armR);
+}
+player.position.set(0, 0, 6);
+scene.add(player);
+
+/* pompwagen (manual pallet jack) — articulated
+   HAND_BACK: hand offset behind the player
+   HANDLE_L : rigid handle length, hand -> steering pivot (never stretches)
+   JACK_D   : steering pivot -> load rollers at the fork tips
+   HOUS_OFF : mesh origin sits this far ahead of the steering pivot     */
+const HAND_BACK = 0.3, HANDLE_L = 0.95, JACK_D = 1.34, HOUS_OFF = 0.62;
+const jack = new THREE.Group();
+const jackBody = new THREE.Group();
+let handleGroup, steerGroup, steerSpin;
+const rollerSpins = [];
+{
+  const red = 0xd93b2b, dark = 0x8f2317;
+  jackBody.add(box(0.5, 0.3, 0.42, red, 0, 0.28, -HOUS_OFF));            // pump housing
+  jackBody.add(box(0.17, 0.09, 1.25, red, -0.24, 0.14, 0.18));           // forks
+  jackBody.add(box(0.17, 0.09, 1.25, red,  0.24, 0.14, 0.18));
+  const wm = mat(0x2a2f38);
+  /* steering wheel: yaw group (turns with handle) -> spin group -> wheel + hub */
+  steerGroup = new THREE.Group(); steerGroup.position.set(0, 0.14, -HOUS_OFF);
+  steerSpin = new THREE.Group();
+  const sw = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.12, 12), wm);
+  sw.rotation.z = Math.PI/2; sw.castShadow = true;
+  steerSpin.add(sw, box(0.13, 0.05, 0.26, 0x6b7280, 0, 0, 0, false));
+  steerGroup.add(steerSpin);
+  jackBody.add(steerGroup);
+  /* load rollers at the fork tips */
+  for (const dx of [-0.24, 0.24]){
+    const g = new THREE.Group(); g.position.set(dx, 0.06, 0.72);
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 10), wm);
+    r.rotation.z = Math.PI/2;
+    g.add(r, box(0.11, 0.028, 0.11, 0x6b7280, 0, 0, 0, false));
+    jackBody.add(g); rollerSpins.push(g);
+  }
+  /* rigid handle, pivots on the steering wheel */
+  handleGroup = new THREE.Group(); handleGroup.position.set(0, 0.18, -HOUS_OFF);
+  const bar = box(0.06, 0.06, 1.0, dark, 0, 0.2, -0.45);
+  bar.rotation.x = -0.42;
+  const grip = box(0.34, 0.07, 0.07, 0x2a2f38, 0, 0.42, -0.92);
+  handleGroup.add(bar, grip);
+  jackBody.add(handleGroup);
+}
+jack.add(jackBody);
+scene.add(jack);
+/* physics state: jackP = steering pivot position, jackF = body forward (toward fork tips) */
+const jackP = new THREE.Vector3(0, 0, 6 - HAND_BACK - HANDLE_L);
+const jackF = new THREE.Vector3(0, 0, -1);
+function placeJackMesh(){
+  jack.position.copy(jackP).addScaledVector(jackF, HOUS_OFF);
+  jack.position.y = 0;
+  jack.rotation.y = Math.atan2(jackF.x, jackF.z);
+}
+placeJackMesh();
+
+/* pallet carried on the forks */
+const carriedRaw   = makePalletMesh(false);
+const carriedGoods = makePalletMesh(true);
+carriedRaw.position.set(0, 0.2, 0.35);
+carriedGoods.position.set(0, 0.2, 0.35);
+carriedRaw.visible = carriedGoods.visible = false;
+jackBody.add(carriedRaw, carriedGoods);
+
+/* ============================ audio ============================ */
+let actx = null;
+function ensureAudio(){
+  if (!actx){ try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function tone(freq, t0, dur, vol=0.12, type='triangle'){
+  if (!actx) return;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, actx.currentTime + t0);
+  g.gain.linearRampToValueAtTime(vol, actx.currentTime + t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + t0 + dur);
+  o.connect(g).connect(actx.destination);
+  o.start(actx.currentTime + t0); o.stop(actx.currentTime + t0 + dur + 0.05);
+}
+const sfx = {
+  pickup(){ tone(392, 0, .12); tone(587, .07, .14); },
+  drop(){ tone(523, 0, .1); tone(392, .06, .12); },
+  cash(){ tone(659, 0, .1, .14); tone(880, .07, .1, .14); tone(1175, .14, .18, .14); },
+  buy(){ tone(523, 0, .12, .13); tone(659, .05, .12, .13); tone(784, .1, .2, .13); },
+  order(){ tone(740, 0, .09, .1, 'square'); tone(740, .14, .09, .1, 'square'); },
+};
+
+/* ============================ input ============================ */
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; ensureAudio(); });
+window.addEventListener('keyup',   e => { keys[e.key.toLowerCase()] = false; });
+
+const joyEl = document.getElementById('joy'), knob = document.getElementById('joyKnob');
+let joyId = null, joyBase = {x:0,y:0}, joyVec = {x:0,y:0};
+const JOY_R = 50;
+function joyStart(x, y){
+  joyBase = {x, y}; joyVec = {x:0, y:0};
+  joyEl.style.display = 'block';
+  joyEl.style.left = (x-60)+'px'; joyEl.style.top = (y-60)+'px';
+  knob.style.transform = 'translate(-50%,-50%)';
+}
+function joyMove(x, y){
+  let dx = x-joyBase.x, dy = y-joyBase.y;
+  const len = Math.hypot(dx, dy);
+  if (len > JOY_R){ dx = dx/len*JOY_R; dy = dy/len*JOY_R; }
+  joyVec = { x:dx/JOY_R, y:dy/JOY_R };
+  knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+function joyEnd(){ joyId = null; joyVec = {x:0,y:0}; joyEl.style.display = 'none'; }
+
+window.addEventListener('touchstart', e => {
+  ensureAudio();
+  for (const t of e.changedTouches){
+    if (t.target.closest && t.target.closest('.btn')) continue;
+    if (joyId === null && t.clientY > window.innerHeight*0.22){
+      joyId = t.identifier; joyStart(t.clientX, t.clientY);
+    }
+  }
+  if (joyId !== null) e.preventDefault();
+}, { passive:false });
+window.addEventListener('touchmove', e => {
+  for (const t of e.changedTouches) if (t.identifier === joyId) joyMove(t.clientX, t.clientY);
+  e.preventDefault();
+}, { passive:false });
+window.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) if (t.identifier === joyId) joyEnd();
+});
+window.addEventListener('touchcancel', () => joyEnd());
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+window.addEventListener('pointerdown', ensureAudio, { once:false });
+
+/* ============================ game state ============================ */
+const S = {
+  money: 0,
+  carrying: null,          // null | 'raw' | 'goods'
+  stock: 0,
+  ordersPending: 0,
+  truckPallets: 3,
+  shipped: 0,
+  speedLevel: 1,
+  upgradeCost: 5,
+  tut: 1,                  // 1..6, 7 = done
+  movedDist: 0,
+  actionCooldown: 0,
+  orderTimer: 6,
+  restockTimer: 8,
+};
+const BASE_SPEED = 4.3;
+const speed = () => BASE_SPEED * (1 + (S.speedLevel-1)*0.13);
+
+/* HUD refs */
+const elMoney = document.getElementById('money');
+const elStock = document.getElementById('stock');
+const elOrders = document.getElementById('orders');
+const elBubble = document.getElementById('bubble');
+const elHint = document.getElementById('hint');
+const btnUp = document.getElementById('btnUpgrade');
+const elUpCost = document.getElementById('upCost');
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+function refreshHUD(){
+  elMoney.textContent = '€' + S.money;
+  elStock.textContent = '🗄️ ' + S.stock;
+  elOrders.style.display = S.ordersPending > 0 ? '' : 'none';
+  elOrders.textContent = '📦 Orders: ' + S.ordersPending;
+  elUpCost.textContent = `€${S.upgradeCost} · Lv ${S.speedLevel}`;
+  btnUp.classList.toggle('cant', S.money < S.upgradeCost);
+  for (let i=0;i<waitingPallets.length;i++) waitingPallets[i].visible = i < S.truckPallets;
+  for (let i=0;i<stockBoxes.length;i++) stockBoxes[i].visible = i < S.stock;
+}
+function setBubble(text){
+  if (!text){ elBubble.classList.remove('show'); return; }
+  elBubble.textContent = text;
+  elBubble.classList.remove('show');
+  requestAnimationFrame(() => requestAnimationFrame(() => elBubble.classList.add('show')));
+}
+function moneyPop(worldPos, text){
+  const v = worldPos.clone().project(camera);
+  const x = (v.x*0.5+0.5)*window.innerWidth;
+  const y = (-v.y*0.5+0.5)*window.innerHeight;
+  const d = document.createElement('div');
+  d.className = 'pop'; d.textContent = text;
+  d.style.left = x+'px'; d.style.top = (y-30)+'px';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 1250);
+  elMoney.classList.remove('bump'); void elMoney.offsetWidth; elMoney.classList.add('bump');
+}
+
+/* juice: scale-bounce a group */
+const bounces = [];
+function bounce(obj, amount=0.35){
+  bounces.push({ obj, t:0, amount });
+}
+function updateBounces(dt){
+  for (let i=bounces.length-1; i>=0; i--){
+    const b = bounces[i]; b.t += dt*5;
+    const s = 1 + Math.sin(Math.min(b.t, Math.PI)) * b.amount * (1 - Math.min(b.t/Math.PI,1)*0.5);
+    b.obj.scale.setScalar(s);
+    if (b.t >= Math.PI){ b.obj.scale.setScalar(1); bounces.splice(i,1); }
+  }
+}
+
+/* ============================ tutorial ============================ */
+let arrowTarget = null;   // THREE.Vector3 or null
+let tutTimer = 0;
+function tutStep(n){
+  S.tut = n;
+  switch(n){
+    case 1: setBubble(isTouch ? '👆 Drag anywhere to move!' : '⌨️ Use WASD or arrow keys to move!');
+            arrowTarget = null; break;
+    case 2: setBubble('🚚 Go to the truck and grab a pallet!');
+            arrowTarget = new THREE.Vector3(truckZone.x, 0, truckZone.z); break;
+    case 3: setBubble('🗄️ Bring it to the racks!');
+            arrowTarget = new THREE.Vector3(rackZone.x, 0, rackZone.z); break;
+    case 4: setBubble('📦 An order came in! Take goods to shipping!');
+            S.ordersPending = 1; sfx.order();
+            arrowTarget = new THREE.Vector3(rackZone.x, 0, rackZone.z); break;
+    case 5: setBubble('💶 Nice! You earned €5!');
+            arrowTarget = null; tutTimer = 1.8; break;
+    case 6: setBubble('⚡ Buy your first upgrade: Faster Pompwagen!');
+            btnUp.classList.add('attention'); arrowTarget = null; break;
+    case 7: setBubble('🎉 Tutorial complete! Keep the pallets moving!');
+            btnUp.classList.remove('attention'); arrowTarget = null; tutTimer = 3.5; break;
+  }
+  refreshHUD();
+}
+tutStep(1);
+refreshHUD();
+
+/* ============================ actions ============================ */
+function inZone(zone){
+  const dx = player.position.x - zone.x, dz = player.position.z - zone.z;
+  return dx*dx + dz*dz < zone.radius*zone.radius;
+}
+function setCarry(type){
+  S.carrying = type;
+  carriedRaw.visible = type === 'raw';
+  carriedGoods.visible = type === 'goods';
+  if (type) bounce(jackBody, 0.3);
+}
+function tryActions(){
+  if (S.actionCooldown > 0) return;
+
+  /* pick up raw pallet at the truck */
+  if (!S.carrying && S.truckPallets > 0 && inZone(truckZone)){
+    if (S.tut === 1 || S.tut === 3) return;    // not this step yet
+    if (S.tut >= 4 && S.tut <= 6) return;      // during order tutorial, focus on the order
+    S.truckPallets--; setCarry('raw'); sfx.pickup();
+    bounce(truckZone.g, 0.25);
+    S.actionCooldown = 0.7;
+    if (S.tut === 2) tutStep(3);
+    refreshHUD(); return;
+  }
+  /* pick up goods at racks when an order is waiting */
+  if (!S.carrying && S.ordersPending > 0 && S.stock > 0 && inZone(rackZone)){
+    if (S.tut <= 3) return;
+    S.stock--; setCarry('goods'); sfx.pickup();
+    bounce(rackZone.g, 0.25);
+    S.actionCooldown = 0.7;
+    if (S.tut === 4) arrowTarget = new THREE.Vector3(shipZone.x, 0, shipZone.z);
+    refreshHUD(); return;
+  }
+  /* drop raw pallet at racks */
+  if (S.carrying === 'raw' && inZone(rackZone)){
+    setCarry(null); S.stock++; sfx.drop();
+    bounce(rackZone.g, 0.25);
+    if (S.stock <= stockBoxes.length) bounce(stockBoxes[S.stock-1], 0.5);
+    S.actionCooldown = 0.7;
+    if (S.tut === 3) tutStep(4);
+    refreshHUD(); return;
+  }
+  /* ship goods */
+  if (S.carrying === 'goods' && S.ordersPending > 0 && inZone(shipZone)){
+    setCarry(null); S.ordersPending--; S.shipped++;
+    const price = 5 + Math.floor(S.shipped/4);
+    S.money += price; sfx.cash();
+    bounce(shipZone.g, 0.3);
+    moneyPop(new THREE.Vector3(shipZone.x, 1.2, shipZone.z), '+€' + price);
+    shipFx();
+    S.actionCooldown = 0.7;
+    if (S.tut === 4) tutStep(5);
+    refreshHUD(); return;
+  }
+}
+
+/* pallet-slides-out-the-door effect */
+const fx = [];
+function shipFx(){
+  const p = makePalletMesh(true);
+  p.position.set(shipZone.x, 0.05, shipZone.z);
+  scene.add(p);
+  fx.push({ obj:p, t:0 });
+}
+function updateFx(dt){
+  for (let i=fx.length-1; i>=0; i--){
+    const f = fx[i]; f.t += dt;
+    f.obj.position.z += dt*5.5;
+    const s = Math.max(0.01, 1 - f.t*1.1);
+    f.obj.scale.setScalar(s);
+    if (f.t > 0.9){ scene.remove(f.obj); fx.splice(i,1); }
+  }
+}
+
+/* ============================ upgrade ============================ */
+btnUp.addEventListener('click', () => {
+  ensureAudio();
+  if (S.money < S.upgradeCost) {
+    btnUp.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}], {duration:250});
+    return;
+  }
+  S.money -= S.upgradeCost;
+  S.speedLevel++;
+  S.upgradeCost = Math.round(S.upgradeCost * 1.7);
+  sfx.buy();
+  bounce(jackBody, 0.5);
+  moneyPop(player.position.clone().setY(1.6), '⚡ Lv ' + S.speedLevel);
+  if (S.tut === 6) tutStep(7);
+  refreshHUD();
+});
+document.getElementById('btnElectric').addEventListener('click', () => {
+  setBubble('🔋 Electric Pompwagen — coming soon!');
+  tutTimer = Math.max(tutTimer, 2.2);
+  if (S.tut >= 7) { clearTimeout(window.__ebt); window.__ebt = setTimeout(()=>{ if(S.tut>=7) setBubble(null); }, 2200); }
+});
+
+/* ============================ movement & physics ============================ */
+const PLAYER_R = 0.45;
+function collide(pos){
+  for (const c of colliders){
+    const nx = Math.max(c.minX, Math.min(pos.x, c.maxX));
+    const nz = Math.max(c.minZ, Math.min(pos.z, c.maxZ));
+    const dx = pos.x - nx, dz = pos.z - nz;
+    const d2 = dx*dx + dz*dz;
+    if (d2 < PLAYER_R*PLAYER_R){
+      if (d2 > 1e-6){
+        const d = Math.sqrt(d2);
+        pos.x = nx + dx/d * PLAYER_R;
+        pos.z = nz + dz/d * PLAYER_R;
+      } else {
+        pos.z = c.minZ - PLAYER_R;   // degenerate: push out one side
+      }
+    }
+  }
+}
+
+let heading = 0;
+let curSpeed = 0;
+
+/* ---- pompwagen kinematics ----
+   Hand is a fixed point behind the player. The handle is a rigid bar of
+   length HANDLE_L from the hand to the steering pivot P, free to swivel at
+   both ends. The load rollers R at the fork tips can't slide sideways, so
+   the body direction is updated by pivoting around R (trailer physics). */
+const _hand = new THREE.Vector3(), _hdir = new THREE.Vector3();
+function handPos(pos, hd){
+  return _hand.set(pos.x - Math.sin(hd)*HAND_BACK, 0, pos.z - Math.cos(hd)*HAND_BACK);
+}
+function solveJack(H){
+  const d = _hdir.set(jackP.x - H.x, 0, jackP.z - H.z);
+  if (d.lengthSq() < 1e-8) d.set(-Math.sin(heading), 0, -Math.cos(heading));
+  d.normalize();
+  const P = new THREE.Vector3(H.x + d.x*HANDLE_L, 0, H.z + d.z*HANDLE_L);
+  const F = new THREE.Vector3().copy(jackP).addScaledVector(jackF, JACK_D).sub(P);
+  F.y = 0;
+  if (F.lengthSq() < 1e-8) F.copy(d);
+  F.normalize();
+  return { P, F };
+}
+function circleHits(x, z, r){
+  for (const c of colliders){
+    const nx = Math.max(c.minX, Math.min(x, c.maxX));
+    const nz = Math.max(c.minZ, Math.min(z, c.maxZ));
+    const dx = x - nx, dz = z - nz;
+    if (dx*dx + dz*dz < r*r) return true;
+  }
+  return false;
+}
+function jackHits(P, F){
+  return circleHits(P.x, P.z, 0.3)
+      || circleHits(P.x + F.x*0.7,    P.z + F.z*0.7,    0.3)
+      || circleHits(P.x + F.x*JACK_D, P.z + F.z*JACK_D, 0.32);
+}
+/* move the player by (dx,dz); the jack must fit too, else the move is refused */
+function tryMove(dx, dz){
+  const cand = player.position.clone();
+  cand.x += dx; cand.z += dz;
+  collide(cand);
+  const s = solveJack(handPos(cand, heading));
+  if (jackHits(s.P, s.F)) return false;
+  S.movedDist += Math.hypot(cand.x - player.position.x, cand.z - player.position.z);
+  /* wheel spin from the actual travel of each axle */
+  const oldRx = jackP.x + jackF.x*JACK_D, oldRz = jackP.z + jackF.z*JACK_D;
+  const dRdot = (s.P.x + s.F.x*JACK_D - oldRx)*s.F.x + (s.P.z + s.F.z*JACK_D - oldRz)*s.F.z;
+  const dPdot = (s.P.x - jackP.x)*s.F.x + (s.P.z - jackP.z)*s.F.z;
+  steerSpin.rotation.x += dPdot / 0.14;
+  for (const g of rollerSpins) g.rotation.x += dRdot / 0.06;
+  player.position.x = cand.x; player.position.z = cand.z;
+  jackP.copy(s.P); jackF.copy(s.F);
+  return true;
+}
+
+function moveInput(){
+  let x = 0, z = 0;
+  if (keys['w'] || keys['arrowup']) z -= 1;
+  if (keys['s'] || keys['arrowdown']) z += 1;
+  if (keys['a'] || keys['arrowleft']) x -= 1;
+  if (keys['d'] || keys['arrowright']) x += 1;
+  x += joyVec.x; z += joyVec.y;
+  const len = Math.hypot(x, z);
+  if (len > 1){ x /= len; z /= len; }
+  return { x, z, mag: Math.min(len, 1) };
+}
+
+/* ============================ camera ============================ */
+const camTarget = new THREE.Vector3();
+function updateCamera(dt){
+  const portrait = camera.aspect < 1;
+  const off = portrait ? { y:14.5, z:8.5 } : { y:11.5, z:8 };
+  camTarget.set(player.position.x*0.85, off.y, player.position.z*0.85 + off.z);
+  camera.position.lerp(camTarget, 1 - Math.pow(0.001, dt));
+  const look = new THREE.Vector3(player.position.x*0.85, 0, player.position.z*0.85 - 1.5);
+  camera.lookAt(look);
+}
+camera.position.set(0, 14, 15);
+
+/* ============================ economy loop (post-tutorial) ============================ */
+function economy(dt){
+  if (S.tut < 7) return;
+  /* truck restocks */
+  S.restockTimer -= dt;
+  if (S.restockTimer <= 0){
+    S.restockTimer = 8;
+    if (S.truckPallets < 3){
+      S.truckPallets++;
+      bounce(truck, 0.06);
+      refreshHUD();
+    }
+  }
+  /* orders roll in */
+  S.orderTimer -= dt;
+  if (S.orderTimer <= 0){
+    S.orderTimer = 9 + Math.random()*6;
+    if (S.ordersPending < 3){
+      S.ordersPending++;
+      sfx.order();
+      bounce(shipZone.g, 0.3);
+      refreshHUD();
+    }
+  }
+}
+
+/* ============================ hints ============================ */
+function updateHint(){
+  if (S.tut < 7){ elHint.textContent = ''; return; }
+  let h = '';
+  if (S.carrying === 'raw') h = 'Drop it at the blue rack zone';
+  else if (S.carrying === 'goods') h = 'Ship it at the green zone!';
+  else if (S.ordersPending > 0 && S.stock > 0) h = 'Grab goods from the racks!';
+  else if (S.truckPallets > 0) h = 'Pick up pallets at the truck';
+  else h = 'Waiting for the next truck…';
+  elHint.textContent = h;
+}
+
+/* ============================ main loop ============================ */
+const clock = new THREE.Clock();
+let t = 0;
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  t += dt;
+
+  /* movement: limited turn rate, accel/brake; heavier when loaded */
+  const inp = moveInput();
+  const wantMove = inp.mag > 0.05;
+  const heavy = !!S.carrying;
+  const TURN  = heavy ? 5.0 : 8.5;
+  const ACC   = heavy ? 5.5 : 11;
+  const BRAKE = 11;
+
+  if (wantMove){
+    const targetHeading = Math.atan2(inp.x, inp.z);
+    let dh = targetHeading - heading;
+    while (dh > Math.PI) dh -= Math.PI*2;
+    while (dh < -Math.PI) dh += Math.PI*2;
+    const oldHeading = heading;
+    heading += Math.max(-TURN*dt, Math.min(TURN*dt, dh));
+    /* turning swings the hand — refuse if it would push the jack into a wall */
+    const rot = solveJack(handPos(player.position, heading));
+    if (jackHits(rot.P, rot.F)) heading = oldHeading;
+    else { jackP.copy(rot.P); jackF.copy(rot.F); }
+  }
+  const targetSpeed = wantMove ? speed() * inp.mag : 0;
+  const rate = targetSpeed > curSpeed ? ACC : BRAKE;
+  curSpeed += Math.max(-rate*dt, Math.min(rate*dt, targetSpeed - curSpeed));
+  if (!wantMove && curSpeed < 0.02) curSpeed = 0;
+
+  const moving = curSpeed > 0.25;
+  if (curSpeed > 0){
+    const dx = Math.sin(heading) * curSpeed * dt;
+    const dz = Math.cos(heading) * curSpeed * dt;
+    if (!tryMove(dx, dz) && !tryMove(dx, 0) && !tryMove(0, dz)) curSpeed *= 0.2;
+    if (S.tut === 1 && S.movedDist > 3) tutStep(2);
+  }
+  /* smooth model turn */
+  let dr = heading - player.rotation.y;
+  while (dr > Math.PI) dr -= Math.PI*2;
+  while (dr < -Math.PI) dr += Math.PI*2;
+  player.rotation.y += dr * Math.min(1, dt*14);
+
+  /* walk animation */
+  const legL = player.getObjectByName('legL'), legR = player.getObjectByName('legR');
+  if (moving){
+    const s = Math.sin(t*11) * 0.55;
+    legL.rotation.x = s; legR.rotation.x = -s;
+    player.position.y = Math.abs(Math.sin(t*11)) * 0.045;
+  } else {
+    legL.rotation.x *= 0.85; legR.rotation.x *= 0.85;
+    player.position.y *= 0.8;
+  }
+
+  /* place the pompwagen; aim the handle and steering wheel at the hand */
+  placeJackMesh();
+  {
+    const hp = handPos(player.position, heading);
+    const yawH = Math.atan2(hp.x - jackP.x, hp.z - jackP.z);
+    const yawB = Math.atan2(jackF.x, jackF.z);
+    let rel = yawH - (yawB + Math.PI);
+    while (rel > Math.PI) rel -= Math.PI*2;
+    while (rel < -Math.PI) rel += Math.PI*2;
+    rel = Math.max(-1.35, Math.min(1.35, rel));
+    handleGroup.rotation.y += (rel - handleGroup.rotation.y) * Math.min(1, dt*18);
+    steerGroup.rotation.y = handleGroup.rotation.y;
+    if (moving) jackBody.position.y = Math.abs(Math.sin(t*11 + 1)) * 0.02;
+    else jackBody.position.y *= 0.8;
+  }
+
+  /* zone pulses */
+  const pulse = 1 + Math.sin(t*3.2)*0.06;
+  for (const z of [truckZone, rackZone, shipZone]){
+    z.g.scale.setScalar(z.g.scale.x); // keep bounce scale, pulse via ring opacity
+    z.ring.material.opacity = 0.55 + Math.sin(t*3.2)*0.3;
+    z.disc.material.opacity = 0.12 + Math.sin(t*3.2)*0.06;
+  }
+  /* highlight the currently useful zone */
+  let hot = null;
+  if (S.carrying === 'raw') hot = rackZone;
+  else if (S.carrying === 'goods') hot = shipZone;
+  else if (S.ordersPending > 0 && S.stock > 0) hot = rackZone;
+  else if (S.truckPallets > 0) hot = truckZone;
+  for (const z of [truckZone, rackZone, shipZone]){
+    const target = z === hot ? pulse * 1.06 : 1;
+    z.g.scale.x += (target - z.g.scale.x) * Math.min(1, dt*8);
+    z.g.scale.y = z.g.scale.z = z.g.scale.x;
+    if (z === hot) z.ring.material.opacity = 0.85 + Math.sin(t*6)*0.15;
+  }
+
+  /* tutorial arrow bob */
+  if (arrowTarget){
+    arrow.visible = true;
+    arrow.position.set(arrowTarget.x, 1.7 + Math.sin(t*4)*0.25, arrowTarget.z);
+    arrow.rotation.y = t*1.5;
+  } else arrow.visible = false;
+
+  /* timed tutorial transitions */
+  if (tutTimer > 0){
+    tutTimer -= dt;
+    if (tutTimer <= 0){
+      if (S.tut === 5) tutStep(6);
+      else if (S.tut === 7) setBubble(null);
+    }
+  }
+
+  if (S.actionCooldown > 0) S.actionCooldown -= dt;
+  tryActions();
+  economy(dt);
+  updateBounces(dt);
+  updateFx(dt);
+  updateHint();
+  updateCamera(dt);
+
+  renderer.render(scene, camera);
+}
+frame();
+</script>
+</body>
+</html>

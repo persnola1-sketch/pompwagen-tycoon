@@ -1,0 +1,24 @@
+{
+  "pompwagen": {
+    "maxSpeed": 3.2,
+    "accel": 7.0,
+    "brake": 10.0,
+    "turnSpeed": 3.4,
+    "capacity": 1,
+    "loadedSpeedFactor": 0.82,
+    "loadedTurnFactor": 0.78,
+    "handleLength": 1.05,
+    "bodyLength": 1.45
+  },
+  "electric": {
+    "maxSpeed": 4.1,
+    "accel": 8.5,
+    "brake": 11.0,
+    "turnSpeed": 3.8,
+    "capacity": 2,
+    "loadedSpeedFactor": 0.88,
+    "loadedTurnFactor": 0.84,
+    "handleLength": 1.05,
+    "bodyLength": 1.6
+  }
+}

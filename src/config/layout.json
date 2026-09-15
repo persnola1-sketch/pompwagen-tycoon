@@ -1,0 +1,42 @@
+{
+  "warehouse": { "width": 34, "depth": 24, "wallHeight": 6 },
+  "docks": {
+    "inboundX": -17, "outboundX": 17,
+    "doorZ": [-4.5, 4.5],
+    "doorWidth": 3.4, "doorHeight": 4.2
+  },
+  "rackRows": {
+    "startRows": 2,
+    "maxRows": 6,
+    "rowZ": [-9.2, -5.6, -2.0, 1.6, 5.2, 8.8],
+    "slotsPerRow": 8,
+    "slotSpacing": 1.5,
+    "firstSlotX": -5.25,
+    "padOffsetZ": 1.55
+  },
+  "pads": {
+    "unload": { "x": -13.5, "z": -4.5 },
+    "load": { "x": 13.5, "z": -4.5 },
+    "office": { "x": 0, "z": 10.2 },
+    "upgradeSpeed": { "x": -4.5, "z": 10.2 },
+    "upgradeElectric": { "x": 4.5, "z": 10.2 },
+    "radius": 1.15
+  },
+  "playerStart": { "x": 0, "z": 6 },
+  "truck": {
+    "inbound": {
+      "spawn": { "x": -26, "z": 34 },
+      "approach": { "x": -26, "z": 0 },
+      "dockOffset": 4.6,
+      "exit": { "x": -26, "z": -34 }
+    },
+    "outbound": {
+      "spawn": { "x": 26, "z": 34 },
+      "approach": { "x": 26, "z": 0 },
+      "dockOffset": 4.6,
+      "exit": { "x": 26, "z": -34 }
+    },
+    "driveSpeed": 8.0,
+    "reverseSpeed": 2.2
+  }
+}
