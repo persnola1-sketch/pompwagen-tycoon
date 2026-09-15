@@ -26,6 +26,7 @@ export type GameEvents = {
   padUnlocked: { padId: string };
   rackRowBuilt: { rowIndex: number };
   upgradeBought: { upgrade: string };
+  warehouseBuilt: Record<string, never>;
 
   tutorialStep: { id: string; text: string };
   tutorialDone: Record<string, never>;

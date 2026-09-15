@@ -10,17 +10,27 @@ interface Coin {
 interface Puff {
   mesh: THREE.Mesh;
   t: number;
+  size: number;
 }
 
-/** Coin-fly effects, dust puffs and the bouncing tutorial guide arrow. */
+interface Spark {
+  mesh: THREE.Mesh;
+  vel: THREE.Vector3;
+  t: number;
+}
+
+/** Coin-fly effects, dust puffs, welding sparks and the bouncing guide arrow. */
 export class Effects {
   readonly group = new THREE.Group();
   private coins: Coin[] = [];
   private puffs: Puff[] = [];
+  private sparkList: Spark[] = [];
   private coinGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.04, 10);
   private coinMat = new THREE.MeshStandardMaterial({ color: 0xf2c018, roughness: 0.3, metalness: 0.7 });
   private puffGeo = new THREE.SphereGeometry(0.14, 6, 6);
   private puffMat = new THREE.MeshBasicMaterial({ color: 0xcfcabc, transparent: true, opacity: 0.5 });
+  private sparkGeo = new THREE.BoxGeometry(0.06, 0.06, 0.06);
+  private sparkMat = new THREE.MeshBasicMaterial({ color: 0xffd24a });
   private arrow: THREE.Mesh;
   private arrowTarget: THREE.Vector3 | null = null;
   private time = 0;
@@ -52,12 +62,26 @@ export class Effects {
     this.coins.push({ mesh, from: from.clone(), to: to.clone(), t: 0 });
   }
 
-  dust(x: number, z: number): void {
-    if (this.puffs.length > 16) return;
+  dust(x: number, z: number, size = 1): void {
+    if (this.puffs.length > 60) return;
     const mesh = new THREE.Mesh(this.puffGeo, this.puffMat.clone());
-    mesh.position.set(x + (Math.random() - 0.5) * 0.3, 0.08, z + (Math.random() - 0.5) * 0.3);
+    mesh.position.set(x + (Math.random() - 0.5) * 0.3 * size, 0.08, z + (Math.random() - 0.5) * 0.3 * size);
     this.group.add(mesh);
-    this.puffs.push({ mesh, t: 0 });
+    this.puffs.push({ mesh, t: 0, size });
+  }
+
+  sparks(x: number, y: number, z: number, n = 8): void {
+    if (this.sparkList.length > 80) return;
+    for (let i = 0; i < n; i++) {
+      const mesh = new THREE.Mesh(this.sparkGeo, this.sparkMat);
+      mesh.position.set(x, y, z);
+      this.group.add(mesh);
+      this.sparkList.push({
+        mesh,
+        vel: new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4),
+        t: 0,
+      });
+    }
   }
 
   setGuide(target: THREE.Vector3 | null): void {
@@ -89,15 +113,24 @@ export class Effects {
         this.puffs.splice(i, 1);
         continue;
       }
-      p.mesh.scale.setScalar(1 + p.t * 2);
+      p.mesh.scale.setScalar((1 + p.t * 2) * p.size);
+      p.mesh.position.y += dt * 0.6 * p.size;
       (p.mesh.material as THREE.MeshBasicMaterial).opacity = 0.4 * (1 - p.t);
     }
+    for (let i = this.sparkList.length - 1; i >= 0; i--) {
+      const s = this.sparkList[i];
+      s.t += dt;
+      if (s.t >= 0.7) {
+        this.group.remove(s.mesh);
+        this.sparkList.splice(i, 1);
+        continue;
+      }
+      s.vel.y -= 9 * dt;
+      s.mesh.position.addScaledVector(s.vel, dt);
+      s.mesh.scale.setScalar(1 - s.t);
+    }
     if (this.arrowTarget) {
-      this.arrow.position.set(
-        this.arrowTarget.x,
-        2.6 + Math.sin(this.time * 4) * 0.35,
-        this.arrowTarget.z,
-      );
+      this.arrow.position.set(this.arrowTarget.x, 2.6 + Math.sin(this.time * 4) * 0.35, this.arrowTarget.z);
     }
   }
 }

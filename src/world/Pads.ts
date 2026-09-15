@@ -175,6 +175,10 @@ export class Pads {
     if (p) p.mesh.visible = visible;
   }
 
+  setAllVisible(visible: boolean, except: string[] = []): void {
+    for (const p of this.pads.values()) if (!except.includes(p.id)) p.mesh.visible = visible;
+  }
+
   setProgress(id: string, frac: number): void {
     const p = this.pads.get(id);
     if (!p || !p.bar) return;

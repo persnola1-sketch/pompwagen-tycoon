@@ -32,6 +32,13 @@
     "radius": 1.15
   },
   "playerStart": { "x": 0, "z": 7 },
+  "plot": {
+    "pad": { "x": 0, "z": 2 },
+    "playerStart": { "x": 0, "z": 9 },
+    "watchPoint": { "x": 0, "z": 19 },
+    "sign": { "x": 11, "z": 15.5 },
+    "container": { "x": -11, "z": 15 }
+  },
   "yard": { "fenceX": 36, "fenceZ": 30, "gateHalfWidth": 5.5, "roadOffset": 8, "roadWidth": 9 },
   "truck": {
     "inbound": {

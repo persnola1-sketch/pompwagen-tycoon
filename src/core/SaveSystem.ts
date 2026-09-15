@@ -21,6 +21,7 @@ function migrateV1(raw: Record<string, unknown>): SaveData {
     electric: !!raw.electric,
     speedLevel: Number(raw.speedLevel) || 0,
     tutorialDone: !!raw.tutorialDone,
+    warehouseBuilt: true,
     padProgress: {},
     stats: (raw.stats as SaveData['stats']) ?? { shipped: 0, earned: 0, spent: 0 },
   };
@@ -44,8 +45,10 @@ export class SaveSystem {
       const data = JSON.parse(raw) as Record<string, unknown>;
       if (data.version === 1) {
         this.state.loadFrom(migrateV1(data));
-      } else if (data.version === SAVE_VERSION) {
+      } else if (typeof data.version === 'number' && data.version >= 2 && data.version <= SAVE_VERSION) {
+        // v2 → v3: players with a warehouse skip the empty-plot intro
         const d = data as unknown as SaveData;
+        if (data.version < 3) d.warehouseBuilt = true;
         d.slots = d.slots.map((s) => (isProduct(s) ? s : null));
         this.state.loadFrom(d);
       } else {

@@ -58,6 +58,18 @@ export class CameraRig {
     this.overview = !this.overview;
   }
 
+  /** cutscene framing: look at a fixed point with a given visible width */
+  cinematic: { x: number; z: number; width: number; pitchDeg: number } | null = null;
+
+  /** camera shake (construction finish, level ups) */
+  shake(amount = 0.5, seconds = 0.5): void {
+    this.shakeAmp = amount;
+    this.shakeT = seconds;
+  }
+
+  private shakeAmp = 0;
+  private shakeT = 0;
+
   get currentDistance(): number {
     return this.distance;
   }
@@ -67,11 +79,14 @@ export class CameraRig {
   }
 
   update(dt: number, player: THREE.Vector3): void {
-    const goalFocus = this.overview
-      ? new THREE.Vector3(cam.overview.x, 0, cam.overview.z)
-      : new THREE.Vector3(player.x, 0, player.z + cam.lookAheadZ);
-    const goalDist = this.overview ? this.overviewDistance() : this.followDistance();
-    const goalPitch = (this.overview ? cam.overview.pitchDeg : cam.pitchDeg) * DEG;
+    const cine = this.cinematic;
+    const goalFocus = cine
+      ? new THREE.Vector3(cine.x, 0, cine.z)
+      : this.overview
+        ? new THREE.Vector3(cam.overview.x, 0, cam.overview.z)
+        : new THREE.Vector3(player.x, 0, player.z + cam.lookAheadZ);
+    const goalDist = cine ? this.fit(cine.width, cine.width * 1.2) : this.overview ? this.overviewDistance() : this.followDistance();
+    const goalPitch = (cine ? cine.pitchDeg : this.overview ? cam.overview.pitchDeg : cam.pitchDeg) * DEG;
 
     if (!this.initialized) {
       this.focus.copy(goalFocus);
@@ -90,5 +105,11 @@ export class CameraRig {
       this.focus.z + Math.cos(this.pitch) * this.distance,
     );
     this.camera.lookAt(this.focus);
+    if (this.shakeT > 0) {
+      this.shakeT -= dt;
+      const a = this.shakeAmp * Math.max(0, this.shakeT);
+      this.camera.position.x += (Math.random() - 0.5) * a;
+      this.camera.position.y += (Math.random() - 0.5) * a;
+    }
   }
 }

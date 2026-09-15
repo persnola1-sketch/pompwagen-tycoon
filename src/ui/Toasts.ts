@@ -31,6 +31,21 @@ export class Toasts {
     setTimeout(() => el.remove(), kind === 'unlock' ? 4200 : 2800);
   }
 
+  /** big centered banner (warehouse opened, level up) */
+  banner(title: string, sub: string, seconds = 3.2): void {
+    document.getElementById('banner')?.remove();
+    const el = document.createElement('div');
+    el.id = 'banner';
+    el.className = 'ui';
+    el.innerHTML = `<div class="big"></div><div class="small"></div>`;
+    (el.querySelector('.big') as HTMLElement).textContent = title;
+    (el.querySelector('.small') as HTMLElement).textContent = sub;
+    el.style.animationDuration = `0.5s, 0.5s`;
+    el.style.animationDelay = `0s, ${seconds}s`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), (seconds + 0.6) * 1000);
+  }
+
   profitSplash(big: string, small: string): void {
     document.getElementById('profit-splash')?.remove();
     const el = document.createElement('div');

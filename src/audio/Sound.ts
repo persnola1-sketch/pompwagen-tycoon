@@ -110,6 +110,27 @@ export class Sound {
     this.tone(523, 0.14, 'sine', 0.15, undefined, 0.2);
     this.tone(659, 0.25, 'sine', 0.16, undefined, 0.3);
   }
+  hammer(): void {
+    this.noise(0.06, 0.25, 1800);
+    this.tone(320, 0.06, 'square', 0.08, 180);
+  }
+  weld(): void {
+    this.noise(0.18, 0.12, 4500);
+    this.tone(2400, 0.12, 'sawtooth', 0.03, 1800);
+  }
+  thud(): void {
+    this.noise(0.2, 0.3, 300);
+    this.tone(70, 0.22, 'sine', 0.3, 40);
+  }
+  opening(): void {
+    this.noise(0.6, 0.25, 900);
+    this.tone(392, 0.15, 'square', 0.12);
+    this.tone(523, 0.15, 'square', 0.12, undefined, 0.14);
+    this.tone(659, 0.15, 'square', 0.12, undefined, 0.28);
+    this.tone(784, 0.2, 'square', 0.13, undefined, 0.42);
+    this.tone(1047, 0.5, 'square', 0.15, undefined, 0.58);
+    this.tone(1319, 0.6, 'sine', 0.12, undefined, 0.6);
+  }
   fanfare(): void {
     this.tone(523, 0.12, 'square', 0.12);
     this.tone(659, 0.12, 'square', 0.12, undefined, 0.11);

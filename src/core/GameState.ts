@@ -3,7 +3,7 @@ import layout from '../config/layout.json';
 import { EventBus } from './EventBus';
 import { PRODUCTS, ProductDef, unlockedProducts } from './Products';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const TOTAL_SLOTS = layout.rackRows.rows.length * layout.rackRows.slotsPerRow;
 
 export interface Stats {
@@ -22,6 +22,8 @@ export interface SaveData {
   electric: boolean;
   speedLevel: number;
   tutorialDone: boolean;
+  /** false on a fresh game: the player starts on an empty plot */
+  warehouseBuilt: boolean;
   padProgress: Record<string, number>;
   stats: Stats;
 }
@@ -34,6 +36,7 @@ export class GameState {
   electric = false;
   speedLevel = 0;
   tutorialDone = false;
+  warehouseBuilt = false;
   padProgress: Record<string, number> = {};
   stats: Stats = { shipped: 0, earned: 0, spent: 0 };
 
@@ -108,6 +111,7 @@ export class GameState {
       electric: this.electric,
       speedLevel: this.speedLevel,
       tutorialDone: this.tutorialDone,
+      warehouseBuilt: this.warehouseBuilt,
       padProgress: { ...this.padProgress },
       stats: { ...this.stats },
     };
@@ -121,6 +125,8 @@ export class GameState {
     this.electric = d.electric;
     this.speedLevel = Math.min(d.speedLevel, economy.payPads.speedUpgrade.costs.length);
     this.tutorialDone = d.tutorialDone;
+    // saves from before the plot intro already have a warehouse
+    this.warehouseBuilt = d.warehouseBuilt ?? true;
     this.padProgress = d.padProgress ?? {};
     this.stats = d.stats ?? { shipped: 0, earned: 0, spent: 0 };
   }

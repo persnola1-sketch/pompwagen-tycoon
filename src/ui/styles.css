@@ -159,6 +159,37 @@ body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 #profit-splash .small { font-size: 16px; font-weight: 700; opacity: 0.9; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
 @keyframes splashIn { from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } }
 
+/* ---------- banner ---------- */
+#banner {
+  left: 50%; top: 34%; transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none;
+  animation-name: splashIn, toastOut; animation-fill-mode: both, forwards;
+  animation-timing-function: cubic-bezier(0.2, 1.6, 0.4, 1), ease;
+}
+#banner .big {
+  font-size: 34px; font-weight: 900; color: #1b2230; background: var(--accent);
+  padding: 10px 26px; border-radius: 18px; box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px; white-space: nowrap;
+}
+#banner .small { margin-top: 10px; font-size: 16px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
+
+/* ---------- construction progress ---------- */
+#construction-hud {
+  left: 50%; transform: translateX(-50%);
+  top: calc(var(--safe-top) + 58px);
+  width: min(320px, calc(100vw - 24px));
+  background: var(--panel); border: 2px solid var(--accent); border-radius: 16px;
+  padding: 10px 14px; text-align: center; pointer-events: none;
+  animation: cardIn 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+#construction-hud .title { font-weight: 800; font-size: 15px; }
+#construction-hud .count { font-size: 26px; font-weight: 900; color: var(--accent); font-variant-numeric: tabular-nums; }
+#construction-hud .bar { height: 10px; background: rgba(255,255,255,0.12); border-radius: 5px; overflow: hidden; margin-top: 6px; }
+#construction-hud .bar i {
+  display: block; height: 100%; width: 0; border-radius: 5px;
+  background: repeating-linear-gradient(45deg, #f2c018 0 10px, #1c1c1c 10px 20px);
+}
+
 /* ---------- dev panel ---------- */
 #dev-panel {
   bottom: calc(var(--safe-bottom) + 8px); left: 10px;

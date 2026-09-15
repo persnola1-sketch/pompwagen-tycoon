@@ -19,6 +19,8 @@ export class Interactions {
   onCargoChanged: (() => void) | null = null;
   onOffice: (() => void) | null = null;
 
+  /** off while the warehouse is not built or during cutscenes */
+  enabled = true;
   private cooldown = 0;
   private officeLatch = false;
 
@@ -33,6 +35,7 @@ export class Interactions {
   ) {}
 
   update(dt: number): void {
+    if (!this.enabled) return;
     const px = this.player.x;
     const pz = this.player.z;
 

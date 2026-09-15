@@ -10,8 +10,10 @@ import { Orders } from './core/Orders';
 import { Tutorial } from './core/Tutorial';
 import { initAssets } from './world/Assets';
 import { SceneRoot } from './world/Scene';
-import { Warehouse } from './world/Warehouse';
+import { AABB, Warehouse } from './world/Warehouse';
 import { Yard } from './world/Yard';
+import { Plot } from './world/Plot';
+import { WarehouseBuild } from './world/construction/WarehouseBuild';
 import { Racks, rowPadZ } from './world/Racks';
 import { Pads } from './world/Pads';
 import { Truck } from './world/Truck';
@@ -26,6 +28,7 @@ import { Popups } from './ui/Popups';
 import { OrderBoard } from './ui/OrderBoard';
 import { TutorialOverlay } from './ui/TutorialOverlay';
 import { Toasts } from './ui/Toasts';
+import { Confetti } from './ui/Confetti';
 import { Interactions } from './game/Interactions';
 import { PayPads } from './game/PayPads';
 import { DevPanel } from './debug/DevPanel';
@@ -40,6 +43,9 @@ class Game {
 
   private root: SceneRoot;
   private warehouse: Warehouse;
+  private plot: Plot;
+  private build: WarehouseBuild | null = null;
+  private buildHud: HTMLElement | null = null;
   private racks: Racks;
   private pads = new Pads();
   private player: Player;
@@ -48,6 +54,7 @@ class Game {
   private customerTruck: Truck;
   private interactions: Interactions;
   private payPads: PayPads;
+  private colliders: AABB[];
 
   private joystick = new Joystick();
   private keyboard = new Keyboard();
@@ -55,6 +62,8 @@ class Game {
   private hud: Hud;
   private popups: Popups;
   private board: OrderBoard;
+  private toasts: Toasts;
+  private confetti = new Confetti();
   private tutorialUi = new TutorialOverlay();
   private dev: DevPanel;
 
@@ -70,7 +79,8 @@ class Game {
     initAssets(this.root.renderer);
     const scene = this.root.scene;
     this.warehouse = new Warehouse();
-    scene.add(this.warehouse.group, new Yard().group);
+    this.plot = new Plot();
+    scene.add(this.warehouse.group, this.plot.group, new Yard().group);
 
     this.racks = new Racks(this.state, this.warehouse.colliders);
     scene.add(this.racks.group);
@@ -87,7 +97,7 @@ class Game {
     this.wireTrucks();
 
     this.hud = new Hud(this.state, this.bus);
-    new Toasts(this.bus);
+    this.toasts = new Toasts(this.bus);
     this.popups = new Popups(this.orders, this.state, this.bus, this.sound);
     this.board = new OrderBoard(this.orders, this.state, this.bus);
     this.board.onCountChanged = (n): void => this.hud.setBoardCount(n);
@@ -107,10 +117,20 @@ class Game {
       this.sound.click();
     };
     this.payPads = new PayPads(this.state, this.bus, this.pads, this.player, this.racks, this.effects, this.sound, this.save);
+    this.payPads.onWarehouseBought = (): void => this.startConstruction();
     this.wireEvents();
 
-    if (this.state.tutorialDone) this.orders.startAuto();
-    else this.tutorial.start();
+    // fresh game: empty plot; otherwise the warehouse is up and running
+    const built = this.state.warehouseBuilt;
+    this.colliders = built ? this.warehouse.colliders : this.plot.colliders;
+    this.setWarehouseVisible(built);
+    if (built) {
+      if (this.state.tutorialDone) this.orders.startAuto();
+      else this.tutorial.start();
+    } else {
+      this.player.teleport(layout.plot.playerStart.x, layout.plot.playerStart.z);
+      this.bus.emit('toast', { text: 'Welcome to your plot! Stand on the BUY WAREHOUSE pad to get started.', kind: 'info' });
+    }
 
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') this.save.save();
@@ -124,6 +144,69 @@ class Game {
       (window as unknown as { __game: Game }).__game = this;
     }
     requestAnimationFrame(this.loop);
+  }
+
+  /** state summary for the headless smoke test (?dev only) */
+  debugInfo(): Record<string, unknown> {
+    return {
+      money: Math.round(this.state.money),
+      built: this.state.warehouseBuilt,
+      tutorialDone: this.state.tutorialDone,
+      player: [Math.round(this.player.x * 10) / 10, Math.round(this.player.z * 10) / 10],
+      building: !!this.build,
+      calls: this.root.renderer.info.render.calls,
+    };
+  }
+
+  // ---------- plot → warehouse ----------
+
+  private setWarehouseVisible(on: boolean): void {
+    this.warehouse.group.visible = on;
+    this.racks.group.visible = on;
+    this.plot.group.visible = !on;
+    this.pads.setAllVisible(on, ['buy-warehouse']);
+    this.interactions.enabled = on;
+  }
+
+  private startConstruction(): void {
+    const wp = layout.plot.watchPoint;
+    this.plot.dressing.visible = false;
+    this.player.frozen = true;
+    this.player.teleport(wp.x, wp.z, Math.PI);
+    this.sound.thud();
+    this.build = new WarehouseBuild(this.root.scene, this.warehouse, this.effects, economy.warehouse.buildSeconds);
+    this.build.onTick = (k): void => {
+      if (k === 'hammer') this.sound.hammer();
+      else if (k === 'weld') this.sound.weld();
+      else this.sound.thud();
+    };
+    this.buildHud = document.createElement('div');
+    this.buildHud.id = 'construction-hud';
+    this.buildHud.className = 'ui';
+    this.buildHud.innerHTML = `<div class="title">🏗️ Building your warehouse…</div><div class="count">10</div><div class="bar"><i></i></div>`;
+    document.body.appendChild(this.buildHud);
+    this.build.start(() => this.onWarehouseBuilt());
+    this.root.rig.cinematic = { x: 0, z: 2, width: layout.warehouse.width + 16, pitchDeg: 50 };
+    this.save.save();
+  }
+
+  private onWarehouseBuilt(): void {
+    this.root.rig.cinematic = null;
+    this.buildHud?.remove();
+    this.buildHud = null;
+    this.build = null;
+    this.colliders = this.warehouse.colliders;
+    this.setWarehouseVisible(true);
+    this.player.frozen = false;
+    this.root.rig.shake(0.9, 0.6);
+    this.confetti.burst();
+    this.toasts.banner('🏭 Warehouse opened!', 'Your business starts now, boss.');
+    this.sound.opening();
+    this.player.character.celebrate();
+    this.bus.emit('warehouseBuilt', {});
+    if (this.state.tutorialDone) this.orders.startAuto();
+    else this.tutorial.start();
+    this.save.save();
   }
 
   // ---------- setup ----------
@@ -251,7 +334,7 @@ class Game {
     }
 
     const camera = this.root.camera;
-    this.player.update(dt, ix, iy, this.warehouse.colliders);
+    this.player.update(dt, ix, iy, this.colliders);
     this.orders.update(dt);
     this.tutorial.update(dt, this.player.speed);
     this.supplierTruck.update(dt, camera);
@@ -264,6 +347,14 @@ class Game {
     this.interactions.update(dt);
     this.payPads.update(dt);
     this.dev.frame(dt);
+
+    if (this.build) {
+      this.build.update(dt);
+      if (this.buildHud) {
+        (this.buildHud.querySelector('.count') as HTMLElement).textContent = String(Math.ceil(this.build.secondsLeft));
+        (this.buildHud.querySelector('.bar i') as HTMLElement).style.width = `${this.build.progress * 100}%`;
+      }
+    }
 
     if (this.tutorial.currentStepId === 'loadTruck') this.effects.setGuide(this.guideFor('loadTruck'));
 

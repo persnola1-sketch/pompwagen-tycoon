@@ -1,5 +1,6 @@
 {
-  "startMoney": 80,
+  "startMoney": 20000,
+  "warehouse": { "cost": 15000, "buildSeconds": 10 },
   "interaction": { "actionCooldown": 0.45 },
   "supplier": {
     "firstOfferDelay": 8,

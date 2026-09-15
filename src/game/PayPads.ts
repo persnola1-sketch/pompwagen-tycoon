@@ -24,6 +24,8 @@ const eur = (n: number): string => `€${n.toLocaleString('en')}`;
  */
 export class PayPads {
   private coinTimer = 0;
+  /** fires once the BUY WAREHOUSE pad is paid off */
+  onWarehouseBought: (() => void) | null = null;
 
   constructor(
     private state: GameState,
@@ -38,6 +40,19 @@ export class PayPads {
     this.refreshRowPads();
     this.refreshSpeedPad();
     this.refreshElectricPad();
+    this.refreshWarehousePad();
+  }
+
+  private refreshWarehousePad(): void {
+    const id = 'buy-warehouse';
+    if (this.state.warehouseBuilt) {
+      this.pads.remove(id);
+      return;
+    }
+    const p = layout.plot.pad;
+    const cost = economy.warehouse.cost;
+    if (!this.pads.has(id)) this.pads.create(id, p.x, p.z, ['BUY WAREHOUSE', eur(cost)], '#38d15e', { withBar: true, size: 3.2, icon: '🏭' });
+    this.pads.setProgress(id, (this.state.padProgress[id] ?? 0) / cost);
   }
 
   private rowCost(row: number): number {
@@ -86,6 +101,15 @@ export class PayPads {
   }
 
   update(dt: number): void {
+    if (!this.state.warehouseBuilt) {
+      this.pay('buy-warehouse', dt, economy.warehouse.cost, () => {
+        this.state.warehouseBuilt = true;
+        this.refreshWarehousePad();
+        this.bus.emit('upgradeBought', { upgrade: 'warehouse' });
+        this.onWarehouseBought?.();
+      });
+      return;
+    }
     const row = this.state.rackRows;
     this.pay(rowPadId(row), dt, this.rowCost(row), () => {
       this.state.rackRows++;
@@ -142,6 +166,7 @@ export class PayPads {
     }
 
     if (newPaid >= cost - 0.001) {
+      this.state.money = Math.round(this.state.money);
       this.state.padProgress[id] = 0;
       this.pads.setProgress(id, 0);
       this.pads.burst(id);
