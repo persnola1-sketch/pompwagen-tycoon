@@ -40,6 +40,10 @@ import { FallenPallets } from './world/workers/FallenPallets';
 import { WorkersPanel } from './ui/WorkersPanel';
 import { ShiftReportUi } from './ui/ShiftReport';
 import { roleDef } from './core/workers/WorkerTypes';
+import { Timers } from './core/Timers';
+import { Construction } from './game/Construction';
+import { TimersHud } from './ui/TimersHud';
+import { AdService } from './services/AdService';
 
 class Game {
   private bus = new EventBus();
@@ -48,6 +52,10 @@ class Game {
   private orders = new Orders(this.state, this.bus);
   private tutorial = new Tutorial(this.state, this.orders, this.bus);
   private workers = new Workers(this.state, this.bus);
+  private timers = new Timers(this.bus);
+  private construction: Construction;
+  private timersHud = new TimersHud(this.timers);
+  private ads = new AdService();
   private workerAI: WorkerAI;
   private fallen: FallenPallets;
   private workersPanel: WorkersPanel;
@@ -88,6 +96,7 @@ class Game {
 
   constructor() {
     this.save.register('workers', this.workers);
+    this.save.register('timers', this.timers);
     this.save.load();
     this.tutorial.hasWorkers = true;
 
@@ -148,8 +157,41 @@ class Game {
       this.board.toggle();
       this.sound.click();
     };
-    this.payPads = new PayPads(this.state, this.bus, this.pads, this.player, this.racks, this.effects, this.sound, this.save);
+    this.payPads = new PayPads(this.state, this.bus, this.pads, this.player, this.effects, this.sound, this.save, this.timers);
     this.payPads.onWarehouseBought = (): void => this.startConstruction();
+    this.construction = new Construction(scene, this.state, this.bus, this.timers, this.racks, this.workers, this.player, this.effects);
+    this.construction.onRefreshPads = (): void => this.payPads.refreshAll();
+    this.construction.onSound = (k): void => {
+      if (k === 'build') this.sound.build();
+      else if (k === 'horn') this.sound.truckHorn();
+      else if (k === 'brake') this.sound.airBrake();
+      else this.sound.backupBeep();
+    };
+    this.timersHud.onFinishAd = (job): void => {
+      void this.ads.showRewarded(`finish ${job.label} now`).then((ok) => {
+        if (ok) this.timers.finishNow(job.id);
+        this.timersHud.render();
+      });
+    };
+    this.timersHud.onFinishPay = (job): void => {
+      const price = this.timers.finishPrice(job);
+      if (this.state.money < price) {
+        this.bus.emit('toast', { text: 'Not enough money!', kind: 'bad' });
+        return;
+      }
+      this.state.addMoney(-price);
+      this.timers.finishNow(job.id);
+      this.sound.coin();
+    };
+    this.bus.on('jobStarted', ({ job }) => {
+      if (job.kind === 'construction') this.tutorial.tip('firstConstruction');
+      this.timersHud.render();
+      this.save.save();
+    });
+    this.bus.on('jobDone', () => {
+      this.timersHud.render();
+      this.save.save();
+    });
     this.wireEvents();
 
     // fresh game: empty plot; otherwise the warehouse is up and running
@@ -185,6 +227,9 @@ class Game {
       building: !!this.build,
       workers: this.workers.workers.map((w) => `${w.name}:${roleDef(w.role).id}:L${w.level}:${w.stats.moved}`),
       stock: this.state.stock,
+      jobs: this.timers.jobs.map((j) => `${j.item}:${Math.ceil(j.left)}`),
+      rows: this.state.rackRows,
+      electric: this.state.electric,
       calls: this.root.renderer.info.render.calls,
     };
   }
@@ -342,14 +387,15 @@ class Game {
 
   private wireTrucks(): void {
     for (const truck of [this.supplierTruck, this.customerTruck]) {
+      const kind: TruckKind = truck === this.supplierTruck ? 'supplier' : 'customer';
       truck.onBeep = (): void => this.sound.backupBeep();
       truck.onDocked = (): void => {
         this.sound.airBrake();
-        this.orders.truckDocked(truck.kind);
-        this.warehouse.setDockLight(truck.kind, true);
+        this.orders.truckDocked(kind);
+        this.warehouse.setDockLight(kind, true);
         this.updateTrucks();
       };
-      truck.onGone = (): void => this.orders.truckGone(truck.kind);
+      truck.onGone = (): void => this.orders.truckGone(kind);
     }
 
     this.bus.on('truckArriving', ({ kind }) => {
@@ -418,7 +464,6 @@ class Game {
     this.bus.on('upgradeBought', ({ upgrade }) => {
       if (upgrade === 'electric') this.tutorial.tip('firstElectric');
     });
-    this.bus.on('rackRowBuilt', () => this.sound.build());
     this.bus.on('productUnlocked', () => {
       this.sound.fanfare();
       this.save.save();
@@ -475,6 +520,10 @@ class Game {
     this.interactions.update(dt);
     this.payPads.update(dt);
     if (this.state.warehouseBuilt && !this.build) {
+      this.timers.update(dt);
+      this.construction.update(dt, camera);
+    }
+    if (this.state.warehouseBuilt && !this.build) {
       this.workers.update(dt, this.state.forklift);
       this.workerAI.update(dt, this.player, this.warehouse.colliders);
     }
@@ -505,6 +554,7 @@ class Game {
       this.boardTick = 0;
       this.board.tick();
       this.workersPanel.tick();
+      this.timersHud.render();
     }
 
     this.saveTimer += dt;

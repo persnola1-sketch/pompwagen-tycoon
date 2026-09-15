@@ -1,0 +1,20 @@
+{
+  "construction": {
+    "rackRow": [10, 30, 60, 120, 180, 180],
+    "upperLevel": 60,
+    "conveyorIn": 90,
+    "conveyorOut": 90,
+    "coffeeMachine": 45,
+    "canteen": 120,
+    "secondDock": 120,
+    "lighting": 60
+  },
+  "delivery": {
+    "electric": 45,
+    "forklift": 80,
+    "truckLeadSeconds": 16,
+    "rollOutSeconds": 2.6
+  },
+  "finishNow": { "pricePerSecond": 2, "minPrice": 20 },
+  "ad": { "fakeSeconds": 3 }
+}

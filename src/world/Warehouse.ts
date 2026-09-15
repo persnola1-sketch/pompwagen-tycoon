@@ -206,7 +206,7 @@ export class Warehouse {
       const inner = side * (HALF_W - 0.02);
       const outer = side * (HALF_W + T);
       doorZ.forEach((dz, idx) => {
-        const active = idx === 0;
+        const active = true;
         for (const e of [-1, 1]) b.box(0.14, doorHeight, 0.14, steel, inner - side * 0.07, doorHeight / 2, dz + e * (doorWidth / 2 + 0.07));
         for (const e of [-1, 1]) {
           b.box(0.4, doorHeight + 0.4, 0.35, rubber, outer + side * 0.2, (doorHeight + 0.4) / 2, dz + e * (doorWidth / 2 + 0.05));
@@ -245,7 +245,7 @@ export class Warehouse {
         sign.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
         this.docks.add(sign);
 
-        if (active) {
+        if (idx === 0) {
           const lx = side * (HALF_W - 0.2);
           const lz = dz - (doorWidth / 2 + 0.9);
           b.box(0.16, 0.46, 0.2, housing, lx, 2.2, lz);

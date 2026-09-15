@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import layout from '../config/layout.json';
 import { TruckKind } from '../core/EventBus';
+
+export type TruckRole = TruckKind | 'delivery';
 import { MergeBuilder, glow, mat, unitBox, unitCylinder } from './Merge';
 import { PALLET_TOP, palletWoodGeometry, palletWoodMaterial } from './Pallet';
 import { LoadInstances } from './ProductVisuals';
@@ -55,7 +57,7 @@ function addWheel(b: MergeBuilder, x: number, z: number, r: number, w: number): 
  */
 export class Truck {
   readonly group = new THREE.Group();
-  kind: TruckKind;
+  kind: TruckRole;
   phase: 'hidden' | 'arriving' | 'docked' | 'leaving' = 'hidden';
   onDocked: (() => void) | null = null;
   onGone: (() => void) | null = null;
@@ -80,10 +82,25 @@ export class Truck {
 
   private woodInst: THREE.InstancedMesh;
   private loads = new LoadInstances(MAX_CARGO, PALLET_TOP);
+  private dockIndex = 0;
+  /** vehicle delivered on the trailer floor (forklift, electric pompwagen) */
+  private vehicleMount = new THREE.Group();
+  private ramp: THREE.Mesh;
+  private rollT = -1;
+  private rollDur = 2.6;
+  private onRolled: (() => void) | null = null;
 
-  constructor(kind: TruckKind, parent: THREE.Object3D) {
+  constructor(kind: TruckRole, parent: THREE.Object3D) {
     this.kind = kind;
-    this.side = kind === 'supplier' ? -1 : 1;
+    this.side = kind === 'customer' ? 1 : -1;
+    this.vehicleMount.position.set(0, FLOOR_Y, TRAILER_LEN / 2);
+    this.vehicleMount.rotation.y = Math.PI;
+    this.group.add(this.vehicleMount);
+    this.ramp = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.06, 2.4), mat(0x8b939e, 0.5, 0.5));
+    this.ramp.position.set(0, FLOOR_Y / 2, -1.1);
+    this.ramp.rotation.x = Math.atan2(FLOOR_Y, 2.2);
+    this.ramp.visible = false;
+    this.group.add(this.ramp);
     this.buildTrailer();
     this.buildTractor();
     this.tractor.position.z = KINGPIN_Z;
@@ -259,6 +276,21 @@ export class Truck {
     this.loads.end();
   }
 
+  /** put a vehicle model in the trailer (null clears it) */
+  setVehicle(obj: THREE.Object3D | null): void {
+    this.vehicleMount.clear();
+    this.vehicleMount.position.set(0, FLOOR_Y, TRAILER_LEN / 2);
+    if (obj) this.vehicleMount.add(obj);
+  }
+
+  /** ramp animation: the vehicle rolls out of the rear doors into the warehouse */
+  rollOut(seconds: number, onDone: () => void): void {
+    this.rollDur = seconds;
+    this.rollT = 0;
+    this.onRolled = onDone;
+    this.ramp.visible = true;
+  }
+
   setLabel(text: string): void {
     this.labelMat.map?.dispose();
     this.labelMat.map = textSprite(text, 'rgba(20,24,32,0.8)', '#ffffff', 512, 160, 52);
@@ -268,10 +300,11 @@ export class Truck {
 
   // ---------- driving ----------
 
-  startArrival(companyName: string, cargo: string[]): void {
-    const cfg = this.kind === 'supplier' ? T.inbound : T.outbound;
+  startArrival(companyName: string, cargo: string[], dockIndex = 0): void {
+    this.dockIndex = dockIndex;
+    const cfg = this.side < 0 ? T.inbound : T.outbound;
     const wallX = this.side * (layout.warehouse.width / 2);
-    const dockZ = layout.docks.doorZ[0];
+    const dockZ = layout.docks.doorZ[dockIndex];
     const laneX = cfg.approach.x;
     const away = this.side < 0 ? -Math.PI / 2 : Math.PI / 2;
     const awayWrapped = away + (this.side < 0 ? Math.PI * 2 : 0);
@@ -299,8 +332,10 @@ export class Truck {
   }
 
   startDeparture(): void {
-    const cfg = this.kind === 'supplier' ? T.inbound : T.outbound;
-    const dockZ = layout.docks.doorZ[0];
+    const cfg = this.side < 0 ? T.inbound : T.outbound;
+    const dockZ = layout.docks.doorZ[this.dockIndex];
+    this.ramp.visible = false;
+    this.rollT = -1;
     const away = this.side < 0 ? -Math.PI / 2 : Math.PI / 2;
     const wallX = this.side * (layout.warehouse.width / 2);
     const rearAtDock = wallX - this.side * T.rearInsideDoor;
@@ -340,6 +375,21 @@ export class Truck {
       this.label.quaternion.copy(parentQ.invert().multiply(camera.quaternion));
     }
 
+    if (this.rollT >= 0) {
+      this.rollT += dt / this.rollDur;
+      const e = Math.min(1, this.rollT);
+      const k = e * e * (3 - 2 * e);
+      this.vehicleMount.position.z = TRAILER_LEN / 2 - (TRAILER_LEN / 2 + 3.2) * k;
+      this.vehicleMount.position.y = FLOOR_Y * Math.max(0, 1 - Math.max(0, (k - 0.6) / 0.35));
+      if (e >= 1) {
+        this.rollT = -1;
+        this.ramp.visible = false;
+        this.vehicleMount.clear();
+        const cb = this.onRolled;
+        this.onRolled = null;
+        cb?.();
+      }
+    }
     if (this.phase === 'hidden' || this.phase === 'docked') return;
     const s = this.segs[this.segIndex];
     if (!s) return;

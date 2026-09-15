@@ -1,3 +1,5 @@
+import type { Job } from './Timers';
+
 export type GameEvents = {
   moneyChanged: { money: number; delta: number };
   reputationChanged: { rep: number };
@@ -40,6 +42,9 @@ export type GameEvents = {
   workerAction: { workerId: number; action: 'unload' | 'store' | 'pick' | 'load' | 'drop'; product: string; x: number; z: number };
   palletDropped: { workerId: number; product: string };
   clerkDecided: { kind: TruckKind; accepted: boolean; text: string };
+  jobStarted: { job: Job };
+  jobDone: { job: Job };
+  deliveryDispatched: { job: Job };
   toast: { text: string; kind: 'good' | 'bad' | 'info' | 'unlock' };
   ordersChanged: Record<string, never>;
 };

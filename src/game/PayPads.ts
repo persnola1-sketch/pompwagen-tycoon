@@ -5,10 +5,11 @@ import { Sound } from '../audio/Sound';
 import { EventBus } from '../core/EventBus';
 import { GameState } from '../core/GameState';
 import { SaveSystem } from '../core/SaveSystem';
+import { Timers } from '../core/Timers';
 import { Effects } from '../world/Effects';
 import { Pads } from '../world/Pads';
 import { Player } from '../world/Player';
-import { Racks, rowLetter, rowPadZ } from '../world/Racks';
+import { rowLetter, rowPadZ } from '../world/Racks';
 
 const R = layout.rackRows;
 const PP = economy.payPads;
@@ -20,7 +21,8 @@ const eur = (n: number): string => `€${n.toLocaleString('en')}`;
 /**
  * Pay-by-standing pads: one unlock pad on the empty floor of every future rack
  * row (only the next one is buyable, the rest show their price locked), the
- * faster-wheels upgrade and the electric pompwagen.
+ * faster-wheels upgrade, the electric pompwagen and the BUY WAREHOUSE pad.
+ * Rack rows and vehicles start a timer job instead of appearing instantly.
  */
 export class PayPads {
   private coinTimer = 0;
@@ -32,11 +34,15 @@ export class PayPads {
     private bus: EventBus,
     private pads: Pads,
     private player: Player,
-    private racks: Racks,
     private effects: Effects,
     private sound: Sound,
     private save: SaveSystem,
+    private timers: Timers,
   ) {
+    this.refreshAll();
+  }
+
+  refreshAll(): void {
     this.refreshRowPads();
     this.refreshSpeedPad();
     this.refreshElectricPad();
@@ -59,21 +65,29 @@ export class PayPads {
     return PP.rackRowCosts[row - R.startRows] ?? Infinity;
   }
 
+  /** the next row to buy: first row that is neither built nor under construction */
+  private nextRow(): number {
+    let row = this.state.rackRows;
+    while (row < R.rows.length && this.timers.has('rackRow', row)) row++;
+    return row;
+  }
+
   refreshRowPads(): void {
+    const next = this.nextRow();
     for (let row = R.startRows; row < R.rows.length; row++) {
       const id = rowPadId(row);
       const cost = this.rowCost(row);
-      if (row < this.state.rackRows || !isFinite(cost)) {
+      if (row < next || !isFinite(cost)) {
         this.pads.remove(id);
         continue;
       }
-      const next = row === this.state.rackRows;
-      const lines = next ? ['NEW RACK ROW', eur(cost)] : [`ROW ${rowLetter(row)}`, `${eur(cost)} 🔒`];
-      const accent = next ? '#38d15e' : '#aeb5c2';
-      if (!this.pads.has(id)) this.pads.create(id, R.rows[row].x, rowPadZ(row), lines, accent, { withBar: true, locked: !next, icon: '🏗️' });
-      else this.pads.setLabel(id, lines, accent, !next);
-      this.pads.setActive(id, next);
-      this.pads.setProgress(id, next ? (this.state.padProgress[id] ?? 0) / cost : 0);
+      const isNext = row === next;
+      const lines = isNext ? ['NEW RACK ROW', eur(cost)] : [`ROW ${rowLetter(row)}`, `${eur(cost)} 🔒`];
+      const accent = isNext ? '#38d15e' : '#aeb5c2';
+      if (!this.pads.has(id)) this.pads.create(id, R.rows[row].x, rowPadZ(row), lines, accent, { withBar: true, locked: !isNext, icon: '🏗️' });
+      else this.pads.setLabel(id, lines, accent, !isNext);
+      this.pads.setActive(id, isNext);
+      this.pads.setProgress(id, isNext ? (this.state.padProgress[id] ?? 0) / cost : 0);
     }
   }
 
@@ -92,12 +106,14 @@ export class PayPads {
   private refreshElectricPad(): void {
     const p = layout.pads.upgradeElectric;
     const owned = this.state.electric;
-    const lines = owned ? ['FORKLIFT', 'COMING SOON'] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`];
-    const accent = owned ? '#8a92a5' : '#38d15e';
-    if (!this.pads.has('upgrade-electric')) this.pads.create('upgrade-electric', p.x, p.z, lines, accent, { withBar: true, locked: owned, icon: '🔋' });
-    else this.pads.setLabel('upgrade-electric', lines, accent, owned);
-    this.pads.setActive('upgrade-electric', !owned);
-    this.pads.setProgress('upgrade-electric', owned ? 0 : (this.state.padProgress['upgrade-electric'] ?? 0) / PP.electricPompwagen);
+    const coming = this.timers.has('electric');
+    const lines = owned ? ['ELECTRIC', 'OWNED ✔'] : coming ? ['ELECTRIC', 'ON THE WAY 🚚'] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`];
+    const accent = owned || coming ? '#8a92a5' : '#38d15e';
+    const locked = owned || coming;
+    if (!this.pads.has('upgrade-electric')) this.pads.create('upgrade-electric', p.x, p.z, lines, accent, { withBar: true, locked, icon: '🔋' });
+    else this.pads.setLabel('upgrade-electric', lines, accent, locked);
+    this.pads.setActive('upgrade-electric', !locked);
+    this.pads.setProgress('upgrade-electric', locked ? 0 : (this.state.padProgress['upgrade-electric'] ?? 0) / PP.electricPompwagen);
   }
 
   update(dt: number): void {
@@ -110,14 +126,10 @@ export class PayPads {
       });
       return;
     }
-    const row = this.state.rackRows;
+    const row = this.nextRow();
     this.pay(rowPadId(row), dt, this.rowCost(row), () => {
-      this.state.rackRows++;
-      this.racks.revealRow(row);
-      this.bus.emit('rackRowBuilt', { rowIndex: row });
-      this.bus.emit('stockChanged', { stock: this.state.stock, capacity: this.state.capacity });
+      this.timers.start('construction', 'rackRow', row, `Rack row ${rowLetter(row)}`, this.timers.constructionSeconds('rackRow', row - R.startRows));
       this.refreshRowPads();
-      this.bus.emit('toast', { text: `Rack row ${rowLetter(row)} built! +${R.slotsPerRow} slots`, kind: 'good' });
     });
 
     const lvl = this.state.speedLevel;
@@ -130,13 +142,10 @@ export class PayPads {
       this.sound.build();
     });
 
-    this.pay('upgrade-electric', dt, this.state.electric ? Infinity : PP.electricPompwagen, () => {
-      this.state.electric = true;
-      this.player.setElectric(true);
-      this.bus.emit('upgradeBought', { upgrade: 'electric' });
+    this.pay('upgrade-electric', dt, this.state.electric || this.timers.has('electric') ? Infinity : PP.electricPompwagen, () => {
+      this.timers.start('delivery', 'electric', 0, 'Electric pompwagen');
       this.refreshElectricPad();
-      this.bus.emit('toast', { text: 'Electric pompwagen! Carries 2 pallets and bigger orders arrive', kind: 'good' });
-      this.sound.fanfare();
+      this.bus.emit('toast', { text: 'Electric pompwagen ordered — the delivery truck is on its way', kind: 'good' });
     });
   }
 

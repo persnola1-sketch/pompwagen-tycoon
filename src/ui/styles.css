@@ -296,3 +296,27 @@ body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 .levelups { list-style: none; padding: 0; margin: 0 0 12px; font-size: 13px; }
 .modal .btns { display: flex; gap: 8px; }
 .modal .btns button { flex: 1; min-height: 46px; }
+
+/* ---------- timers hud ---------- */
+#timers-hud {
+  top: calc(var(--safe-top) + 100px); left: calc(var(--safe-left) + 10px);
+  display: flex; flex-direction: column; gap: 6px; pointer-events: none; width: 168px;
+}
+.timer-chip {
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+  padding: 6px 8px; font-size: 12px; pointer-events: auto; animation: toastIn 0.3s;
+}
+.tc-main { display: flex; justify-content: space-between; gap: 6px; font-weight: 700; }
+.tc-main b { font-variant-numeric: tabular-nums; color: var(--accent); }
+.tc-bar { height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin: 5px 0; }
+.tc-bar i { display: block; height: 100%; background: var(--accent); }
+.tc-btns { display: flex; gap: 4px; }
+.tc-btns button { flex: 1; border: none; border-radius: 8px; padding: 6px 4px; font-size: 11px; font-weight: 800; color: #fff; background: #4b3fb8; min-height: 30px; }
+.tc-btns button:last-child { background: #3a4457; flex: 0 0 auto; padding: 6px 8px; }
+
+/* ---------- ad overlay ---------- */
+.ad-card { text-align: center; }
+.ad-badge { display: inline-block; background: #4b3fb8; color: #fff; font-weight: 900; font-size: 12px; letter-spacing: 1px; padding: 5px 12px; border-radius: 10px; }
+.ad-reason { margin: 12px 0 4px; font-weight: 700; }
+.ad-count { font-size: 56px; font-weight: 900; color: var(--accent); }
+.modal button.ghost { background: transparent; color: #aeb5c2; margin-top: 10px; }
