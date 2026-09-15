@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import './ui/styles.css';
-import cam from './config/camera.json';
 import economy from './config/economy.json';
 import layout from './config/layout.json';
 import tutorialCfg from './config/tutorial.json';
@@ -91,13 +90,15 @@ class Game {
     new Toasts(this.bus);
     this.popups = new Popups(this.orders, this.state, this.bus, this.sound);
     this.board = new OrderBoard(this.orders, this.state, this.bus);
+    this.board.onCountChanged = (n): void => this.hud.setBoardCount(n);
+    this.board.onClose = (): void => this.sound.click();
     this.dev = new DevPanel(this.state, this.save, this.root.renderer);
     this.wireCamera();
 
     const p = layout.pads;
-    this.pads.create('unload', p.unload.x, p.unload.z, ['UNLOAD', '🚚→📦'], '#7ec8ff', false);
-    this.pads.create('load', p.load.x, p.load.z, ['LOAD', '📦→🚚'], '#ffb56b', false);
-    this.pads.create('office', p.office.x, p.office.z, ['OFFICE'], '#e8eaf0', false, 1.8);
+    this.pads.create('unload', p.unload.x, p.unload.z, ['UNLOAD', 'take pallets'], '#7ec8ff', { icon: '📥' });
+    this.pads.create('load', p.load.x, p.load.z, ['LOAD', 'fill the truck'], '#ffb56b', { icon: '📤' });
+    this.pads.create('office', p.office.x, p.office.z, ['OFFICE', 'orders'], '#e8eaf0', { size: 1.8, icon: '🗂️' });
 
     this.interactions = new Interactions(this.state, this.orders, this.bus, this.pads, this.player, this.racks, this.sound);
     this.interactions.onCargoChanged = (): void => this.updateTrucks();
@@ -256,7 +257,8 @@ class Game {
     this.supplierTruck.update(dt, camera);
     this.customerTruck.update(dt, camera);
     this.racks.update(dt);
-    this.pads.update(dt, camera);
+    this.pads.update(dt, camera, this.root.rig.currentDistance);
+    this.warehouse.update(dt, camera, new THREE.Vector3(this.player.x, 0.8, this.player.z));
     this.effects.update(dt);
     this.popups.update();
     this.interactions.update(dt);
@@ -284,7 +286,6 @@ class Game {
     }
 
     this.root.update(dt, this.player.position);
-    this.warehouse.setCeilingVisible(this.root.rig.currentDistance > cam.ceilingHideDistance);
     this.root.render();
   };
 }

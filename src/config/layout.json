@@ -32,17 +32,17 @@
     "radius": 1.15
   },
   "playerStart": { "x": 0, "z": 7 },
-  "yard": { "fenceX": 50, "fenceZ": 46, "gateHalfWidth": 5.5, "roadOffset": 8, "roadWidth": 9 },
+  "yard": { "fenceX": 36, "fenceZ": 30, "gateHalfWidth": 5.5, "roadOffset": 8, "roadWidth": 9 },
   "truck": {
     "inbound": {
-      "spawn": { "x": -28, "z": 66 },
+      "spawn": { "x": -28, "z": 50 },
       "approach": { "x": -28, "z": 0 },
-      "exit": { "x": -28, "z": -66 }
+      "exit": { "x": -28, "z": -50 }
     },
     "outbound": {
-      "spawn": { "x": 28, "z": 66 },
+      "spawn": { "x": 28, "z": 50 },
       "approach": { "x": 28, "z": 0 },
-      "exit": { "x": 28, "z": -66 }
+      "exit": { "x": 28, "z": -50 }
     },
     "length": 13.2,
     "rearInsideDoor": 1.2,

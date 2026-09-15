@@ -15,6 +15,7 @@ const PP = economy.payPads;
 const SPEED = PP.speedUpgrade;
 
 const rowPadId = (row: number): string => `rack-row-${row}`;
+const eur = (n: number): string => `€${n.toLocaleString('en')}`;
 
 /**
  * Pay-by-standing pads: one unlock pad on the empty floor of every future rack
@@ -52,9 +53,9 @@ export class PayPads {
         continue;
       }
       const next = row === this.state.rackRows;
-      const lines = next ? ['NEW RACK ROW', `€${cost.toLocaleString('en')}`] : [`ROW ${rowLetter(row)} 🔒`, `€${cost.toLocaleString('en')}`];
+      const lines = next ? ['NEW RACK ROW', eur(cost)] : [`ROW ${rowLetter(row)}`, `${eur(cost)} 🔒`];
       const accent = next ? '#38d15e' : '#aeb5c2';
-      if (!this.pads.has(id)) this.pads.create(id, R.rows[row].x, rowPadZ(row), lines, accent, true, 2.2, !next);
+      if (!this.pads.has(id)) this.pads.create(id, R.rows[row].x, rowPadZ(row), lines, accent, { withBar: true, locked: !next, icon: '🏗️' });
       else this.pads.setLabel(id, lines, accent, !next);
       this.pads.setActive(id, next);
       this.pads.setProgress(id, next ? (this.state.padProgress[id] ?? 0) / cost : 0);
@@ -65,9 +66,9 @@ export class PayPads {
     const p = layout.pads.upgradeSpeed;
     const lvl = this.state.speedLevel;
     const maxed = lvl >= SPEED.costs.length;
-    const lines = maxed ? ['SPEED MAX', `LV ${lvl}`] : ['FASTER WHEELS', `€${SPEED.costs[lvl].toLocaleString('en')} · LV${lvl + 1}`];
+    const lines = maxed ? ['SPEED MAX', `LV ${lvl}`] : ['FASTER WHEELS', `${eur(SPEED.costs[lvl])} · LV${lvl + 1}`];
     const accent = maxed ? '#8a92a5' : '#ffb020';
-    if (!this.pads.has('upgrade-speed')) this.pads.create('upgrade-speed', p.x, p.z, lines, accent, true, 2.2, maxed);
+    if (!this.pads.has('upgrade-speed')) this.pads.create('upgrade-speed', p.x, p.z, lines, accent, { withBar: true, locked: maxed, icon: '⚡' });
     else this.pads.setLabel('upgrade-speed', lines, accent, maxed);
     this.pads.setActive('upgrade-speed', !maxed);
     this.pads.setProgress('upgrade-speed', maxed ? 0 : (this.state.padProgress['upgrade-speed'] ?? 0) / SPEED.costs[lvl]);
@@ -76,9 +77,9 @@ export class PayPads {
   private refreshElectricPad(): void {
     const p = layout.pads.upgradeElectric;
     const owned = this.state.electric;
-    const lines = owned ? ['FORKLIFT', 'COMING SOON'] : ['ELECTRIC', `POMPWAGEN €${PP.electricPompwagen.toLocaleString('en')}`];
+    const lines = owned ? ['FORKLIFT', 'COMING SOON'] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`];
     const accent = owned ? '#8a92a5' : '#38d15e';
-    if (!this.pads.has('upgrade-electric')) this.pads.create('upgrade-electric', p.x, p.z, lines, accent, true, 2.2, owned);
+    if (!this.pads.has('upgrade-electric')) this.pads.create('upgrade-electric', p.x, p.z, lines, accent, { withBar: true, locked: owned, icon: '🔋' });
     else this.pads.setLabel('upgrade-electric', lines, accent, owned);
     this.pads.setActive('upgrade-electric', !owned);
     this.pads.setProgress('upgrade-electric', owned ? 0 : (this.state.padProgress['upgrade-electric'] ?? 0) / PP.electricPompwagen);
@@ -115,7 +116,8 @@ export class PayPads {
     });
   }
 
-  private pay(id: string, dt: number, cost: number, onComplete: () => void): void {
+  /** generic pay-by-standing step; shared with other pad owners */
+  pay(id: string, dt: number, cost: number, onComplete: () => void): void {
     if (!isFinite(cost)) return;
     const pad = this.pads.get(id);
     if (!pad || !pad.active || !this.pads.isOn(id, this.player.x, this.player.z)) return;
@@ -142,6 +144,7 @@ export class PayPads {
     if (newPaid >= cost - 0.001) {
       this.state.padProgress[id] = 0;
       this.pads.setProgress(id, 0);
+      this.pads.burst(id);
       this.bus.emit('padUnlocked', { padId: id });
       onComplete();
       this.save.save();

@@ -39,12 +39,25 @@
   min-height: 36px;
 }
 #overview-toggle.on { background: var(--accent); color: #1b2230; }
+.hud-btns button { position: relative; }
+.badge {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--bad); color: #fff; font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.badge[hidden] { display: none; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; }
+.panel-head h3 { margin: 0 !important; }
+.panel-head .close {
+  background: rgba(255,255,255,0.1); border: none; color: #e8eaf0; border-radius: 10px;
+  width: 32px; height: 32px; font-size: 14px; font-weight: 800;
+}
 body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 
 /* ---------- order board ---------- */
 #order-board {
-  top: calc(var(--safe-top) + 54px); right: calc(var(--safe-right) + 10px); width: 240px;
-  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 140px); overflow-y: auto;
+  top: calc(var(--safe-top) + 54px); right: calc(var(--safe-right) + 10px); width: min(240px, calc(100vw - 20px));
+  max-height: min(46dvh, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 140px)); overflow-y: auto;
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 14px; padding: 10px; font-size: 13px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.4);

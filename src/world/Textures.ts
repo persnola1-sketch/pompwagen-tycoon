@@ -119,28 +119,28 @@ export function hazardTexture(): THREE.CanvasTexture {
   return tex(c, 1);
 }
 
-/** steel plate texture for floor pads, with painted label */
+/** steel plate texture for floor pads, with a big painted label readable at default zoom */
 export function padPlateTexture(lines: string[], accent: string, locked = false): THREE.CanvasTexture {
-  const size = 256;
+  const size = 512;
   const [c, ctx] = canvas(size);
   ctx.fillStyle = locked ? '#4c525c' : '#6d7480';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < 600; i++) {
     ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.06})`;
-    ctx.fillRect(0, Math.random() * size, size, 1);
+    ctx.fillRect(0, Math.random() * size, size, 2);
   }
   // diamond tread pattern
   ctx.fillStyle = 'rgba(255,255,255,0.07)';
-  for (let x = 28; x < size - 20; x += 18) {
-    for (let y = 28; y < size - 20; y += 18) {
+  for (let x = 56; x < size - 40; x += 36) {
+    for (let y = 56; y < size - 40; y += 36) {
       ctx.save();
-      ctx.translate(x + ((y / 18) % 2) * 9, y);
+      ctx.translate(x + ((y / 36) % 2) * 18, y);
       ctx.rotate(Math.PI / 4);
-      ctx.fillRect(-5, -1.5, 10, 3);
+      ctx.fillRect(-10, -3, 20, 6);
       ctx.restore();
     }
   }
-  const bw = 22;
+  const bw = 40;
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, size, size);
@@ -149,34 +149,76 @@ export function padPlateTexture(lines: string[], accent: string, locked = false)
   ctx.fillStyle = locked ? '#8a8f98' : '#f2c018';
   ctx.fillRect(0, 0, size, size);
   ctx.fillStyle = '#1c1c1c';
-  for (let i = -size; i < size * 2; i += 36) {
+  for (let i = -size; i < size * 2; i += 72) {
     ctx.save();
     ctx.translate(i, 0);
     ctx.rotate(Math.PI / 4);
-    ctx.fillRect(0, -size, 18, size * 3);
+    ctx.fillRect(0, -size, 36, size * 3);
     ctx.restore();
   }
   ctx.restore();
+  // dark painted field behind the text for contrast
+  ctx.fillStyle = 'rgba(20,24,32,0.55)';
+  ctx.fillRect(bw + 10, bw + 10, size - bw * 2 - 20, size - bw * 2 - 20);
   ctx.fillStyle = 'rgba(30,34,40,0.8)';
-  for (const [rx, ry] of [[34, 34], [size - 34, 34], [34, size - 34], [size - 34, size - 34]]) {
+  for (const [rx, ry] of [[62, 62], [size - 62, 62], [62, size - 62], [size - 62, size - 62]]) {
     ctx.beginPath();
-    ctx.arc(rx, ry, 5, 0, Math.PI * 2);
+    ctx.arc(rx, ry, 9, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fontSize = lines.length > 1 ? 40 : 48;
-  const lineH = fontSize * 1.15;
+  const fontSize = lines.length > 1 ? 88 : 104;
+  const lineH = fontSize * 1.12;
   const startY = size / 2 - ((lines.length - 1) * lineH) / 2;
   for (let i = 0; i < lines.length; i++) {
-    ctx.font = `800 ${fontSize}px -apple-system, sans-serif`;
-    ctx.fillStyle = i === 0 ? accent : '#e8eaf0';
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = 4;
-    ctx.strokeText(lines[i], size / 2, startY + i * lineH, size - bw * 2 - 16);
-    ctx.fillText(lines[i], size / 2, startY + i * lineH, size - bw * 2 - 16);
+    ctx.font = `900 ${fontSize}px -apple-system, sans-serif`;
+    ctx.fillStyle = i === 0 ? accent : '#ffffff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 8;
+    ctx.strokeText(lines[i], size / 2, startY + i * lineH, size - bw * 2 - 40);
+    ctx.fillText(lines[i], size / 2, startY + i * lineH, size - bw * 2 - 40);
   }
   return clampTex(c);
+}
+
+/** floating billboard label above a pad: icon + title + cost on a dark rounded panel */
+export function padLabelTexture(icon: string, title: string, sub: string, accent: string, locked = false): THREE.CanvasTexture {
+  const W = 512;
+  const H = 176;
+  const [c, ctx] = canvas(W, H);
+  ctx.clearRect(0, 0, W, H);
+  const r = 34;
+  ctx.beginPath();
+  ctx.moveTo(r, 4);
+  ctx.arcTo(W - 4, 4, W - 4, H - 4, r);
+  ctx.arcTo(W - 4, H - 4, 4, H - 4, r);
+  ctx.arcTo(4, H - 4, 4, 4, r);
+  ctx.arcTo(4, 4, W - 4, 4, r);
+  ctx.closePath();
+  ctx.fillStyle = locked ? 'rgba(40,44,52,0.88)' : 'rgba(20,24,32,0.9)';
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = locked ? '#7a8090' : accent;
+  ctx.stroke();
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.font = '100px -apple-system, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(icon, 78, H / 2 + 6);
+  ctx.textAlign = 'left';
+  const hasSub = sub.length > 0;
+  ctx.font = `900 ${hasSub ? 58 : 66}px -apple-system, sans-serif`;
+  ctx.fillStyle = locked ? '#b9bfcc' : '#ffffff';
+  ctx.fillText(title, 150, hasSub ? 60 : H / 2, W - 170);
+  if (hasSub) {
+    ctx.font = '800 54px -apple-system, sans-serif';
+    ctx.fillStyle = locked ? '#8a92a5' : accent;
+    ctx.fillText(sub, 150, 122, W - 170);
+  }
+  const t = clampTex(c);
+  t.minFilter = THREE.LinearFilter;
+  return t;
 }
 
 /** simple text texture (labels, boards) */

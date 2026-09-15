@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import layout from '../config/layout.json';
 import { TruckKind } from '../core/EventBus';
 import { loadTexture } from './Assets';
+import { Cutaway } from './Cutaway';
 import { LAMP_X, TRUSS_Z, buildFloorMarkings } from './FloorMarkings';
 import { MergeBuilder, glow, mat, unitBox, unitCylinder, unitSphere, uvBox } from './Merge';
 import { palletWoodGeometry, palletWoodMaterial } from './Pallet';
@@ -32,48 +33,81 @@ const HALF_D = D / 2;
 const T = 0.3;
 const WALL_TILE = 2.2;
 
+export interface WallSegment {
+  mesh: THREE.Mesh;
+  /** unit direction pointing outward, used by the construction slide-in */
+  outX: number;
+  outZ: number;
+}
+
 /**
  * Warehouse interior: textured concrete floor with painted markings, metal wall
  * panels on a concrete plinth, steel columns, open roof trusses with high-bay
  * lamps, dock doors with rubber seals, levelers and dock lights, safety signs,
- * bollards, fire extinguishers and props. Static parts are merged per material.
+ * bollards, fire extinguishers and props.
+ *
+ * Built as separate part groups (slab, frame, walls, docks, roof, props) so the
+ * construction sequence can assemble them piece by piece, and every wall
+ * segment is its own mesh so the cutaway can fade the ones blocking the view.
  */
 export class Warehouse {
   readonly group = new THREE.Group();
   readonly colliders: AABB[] = [];
-  private dockLamps = new Map<TruckKind, { red: THREE.MeshBasicMaterial; green: THREE.MeshBasicMaterial }>();
+  readonly cutaway = new Cutaway();
 
-  private wallMat: THREE.MeshStandardMaterial;
+  readonly slab = new THREE.Group();
+  readonly frame = new THREE.Group();
+  readonly walls = new THREE.Group();
+  readonly docks = new THREE.Group();
+  readonly roof = new THREE.Group();
+  readonly props = new THREE.Group();
+  readonly wallSegments: WallSegment[] = [];
+
+  private dockLamps = new Map<TruckKind, { red: THREE.MeshBasicMaterial; green: THREE.MeshBasicMaterial }>();
+  private wallMats: THREE.MeshStandardMaterial[] = [];
   private hazardMat: THREE.MeshStandardMaterial;
-  private ceiling: THREE.Group;
+  private wallTex: THREE.Texture;
+  private wallNormal: THREE.Texture | null = null;
 
   constructor() {
-    this.wallMat = new THREE.MeshStandardMaterial({ color: 0xdde3ea, roughness: 0.55, metalness: 0.35 });
-    const fallback = corrugatedWallTexture();
-    fallback.repeat.set(1, 1);
-    this.wallMat.map = fallback;
+    this.wallTex = corrugatedWallTexture();
+    this.wallTex.repeat.set(1, 1);
     loadTexture('metal_wall_diff', {}, (t) => {
-      this.wallMat.map = t;
-      this.wallMat.needsUpdate = true;
+      this.wallTex = t;
+      for (const m of this.wallMats) {
+        m.map = t;
+        m.needsUpdate = true;
+      }
     });
     loadTexture('metal_wall_nor', { color: false }, (t) => {
-      this.wallMat.normalMap = t;
-      this.wallMat.normalScale.set(0.8, 0.8);
-      this.wallMat.needsUpdate = true;
+      this.wallNormal = t;
+      for (const m of this.wallMats) {
+        m.normalMap = t;
+        m.normalScale.set(0.8, 0.8);
+        m.needsUpdate = true;
+      }
     });
     const hz = hazardTexture();
     hz.repeat.set(2, 2);
     this.hazardMat = new THREE.MeshStandardMaterial({ map: hz, roughness: 0.55 });
 
     this.buildFloor();
-    const b = new MergeBuilder();
-    this.buildWalls(b);
-    this.buildDocks(b);
-    this.buildSafety(b);
-    this.buildProps(b);
-    this.group.add(b.build());
-    this.ceiling = this.buildCeiling();
-    this.group.add(this.ceiling);
+    this.buildFrame();
+    this.buildWalls();
+    this.buildDocks();
+    this.buildProps();
+    this.buildCeiling();
+    this.group.add(this.slab, this.frame, this.walls, this.docks, this.roof, this.props);
+  }
+
+  private newWallMat(): THREE.MeshStandardMaterial {
+    const m = new THREE.MeshStandardMaterial({ color: 0xdde3ea, roughness: 0.55, metalness: 0.35, map: this.wallTex, transparent: true });
+    if (this.wallNormal) {
+      m.normalMap = this.wallNormal;
+      m.normalScale.set(0.8, 0.8);
+    }
+    this.wallMats.push(m);
+    return m;
   }
 
   private collide(x: number, z: number, hw: number, hd: number): void {
@@ -93,37 +127,21 @@ export class Warehouse {
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
-    this.group.add(floor, buildFloorMarkings());
+    // concrete slab edge visible from outside
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(W + 0.6, 0.3, D + 0.6), mat(0x9ea2a8, 0.9));
+    edge.position.y = -0.16;
+    this.slab.add(floor, buildFloorMarkings(), edge);
   }
 
-  // ---------- walls, plinth, columns ----------
-  private buildWalls(b: MergeBuilder): void {
+  // ---------- columns, plinth, eaves ----------
+  private buildFrame(): void {
+    const b = new MergeBuilder();
     const plinth = mat(0x9ea2a8, 0.9);
     const column = mat(0x46546a, 0.5, 0.5);
     const eave = mat(0x2d333d, 0.6, 0.4);
-    const wall = (w: number, h: number, d: number, x: number, y: number, z: number, collide: boolean): void => {
-      b.add(uvBox(w, h, d, WALL_TILE), this.wallMat, x, y, z);
-      if (collide) this.collide(x, z, w / 2, d / 2);
-    };
-
-    // north wall (solid) and low south parapet so the camera sees in
-    wall(W + T * 2, H, T, 0, H / 2, -HALF_D - T / 2, true);
-    const sh = layout.warehouse.southWallHeight;
-    wall(W + T * 2, sh, T, 0, sh / 2, HALF_D + T / 2, true);
-    b.box(W + T * 2, 0.1, T + 0.1, mat(0xf2c018, 0.5), 0, sh + 0.05, HALF_D + T / 2);
-
-    // west/east walls with door openings
-    const { doorZ, doorWidth, doorHeight } = layout.docks;
+    const { doorZ, doorWidth } = layout.docks;
     for (const side of [-1, 1]) {
-      const x = side * (HALF_W + T / 2);
       const edges = [-HALF_D, doorZ[0] - doorWidth / 2, doorZ[0] + doorWidth / 2, doorZ[1] - doorWidth / 2, doorZ[1] + doorWidth / 2, HALF_D];
-      for (let i = 0; i < edges.length - 1; i += 2) {
-        const z0 = edges[i];
-        const z1 = edges[i + 1];
-        if (z1 - z0 > 0.01) wall(T, H, z1 - z0, x, H / 2, (z0 + z1) / 2, true);
-      }
-      for (const dz of doorZ) wall(T, H - doorHeight, doorWidth, x, doorHeight + (H - doorHeight) / 2, dz, false);
-      // plinth segments
       for (let i = 0; i < edges.length - 1; i += 2) {
         const z0 = edges[i];
         const z1 = edges[i + 1];
@@ -139,13 +157,50 @@ export class Warehouse {
       b.box(0.3, H, 0.3, column, cx, H / 2, -HALF_D + 0.18);
       b.box(0.5, 0.03, 0.5, eave, cx, 0.015, -HALF_D + 0.18);
     }
-    // eave beam on top of the tall walls
+    // eave beams on top of the tall walls
     b.box(W + T * 2, 0.3, T + 0.1, eave, 0, H + 0.15, -HALF_D - T / 2);
     for (const side of [-1, 1]) b.box(T + 0.1, 0.3, D, eave, side * (HALF_W + T / 2), H + 0.15, 0);
+    const sh = layout.warehouse.southWallHeight;
+    b.box(W + T * 2, 0.1, T + 0.1, mat(0xf2c018, 0.5), 0, sh + 0.05, HALF_D + T / 2);
+    this.frame.add(b.build());
+  }
+
+  // ---------- walls (one mesh per segment for the cutaway) ----------
+  private buildWalls(): void {
+    const wall = (w: number, h: number, d: number, x: number, y: number, z: number, outX: number, outZ: number, collide: boolean): void => {
+      const mesh = new THREE.Mesh(uvBox(w, h, d, WALL_TILE), this.newWallMat());
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.walls.add(mesh);
+      this.wallSegments.push({ mesh, outX, outZ });
+      const box = new THREE.Box3(new THREE.Vector3(x - w / 2, y - h / 2, z - d / 2), new THREE.Vector3(x + w / 2, y + h / 2, z + d / 2));
+      this.cutaway.add(box, [mesh.material as THREE.Material]);
+      if (collide) this.collide(x, z, w / 2, d / 2);
+    };
+
+    // north wall (solid) and low south parapet so the camera sees in
+    wall(W + T * 2, H, T, 0, H / 2, -HALF_D - T / 2, 0, -1, true);
+    const sh = layout.warehouse.southWallHeight;
+    wall(W + T * 2, sh, T, 0, sh / 2, HALF_D + T / 2, 0, 1, true);
+
+    // west/east walls with door openings
+    const { doorZ, doorWidth, doorHeight } = layout.docks;
+    for (const side of [-1, 1]) {
+      const x = side * (HALF_W + T / 2);
+      const edges = [-HALF_D, doorZ[0] - doorWidth / 2, doorZ[0] + doorWidth / 2, doorZ[1] - doorWidth / 2, doorZ[1] + doorWidth / 2, HALF_D];
+      for (let i = 0; i < edges.length - 1; i += 2) {
+        const z0 = edges[i];
+        const z1 = edges[i + 1];
+        if (z1 - z0 > 0.01) wall(T, H, z1 - z0, x, H / 2, (z0 + z1) / 2, side, 0, true);
+      }
+      for (const dz of doorZ) wall(T, H - doorHeight, doorWidth, x, doorHeight + (H - doorHeight) / 2, dz, side, 0, false);
+    }
   }
 
   // ---------- dock doors ----------
-  private buildDocks(b: MergeBuilder): void {
+  private buildDocks(): void {
+    const b = new MergeBuilder();
     const { doorZ, doorWidth, doorHeight } = layout.docks;
     const rubber = mat(0x1e1f23, 0.95);
     const steel = mat(0x5d6673, 0.45, 0.6);
@@ -156,36 +211,29 @@ export class Warehouse {
       const outer = side * (HALF_W + T);
       doorZ.forEach((dz, idx) => {
         const active = idx === 0;
-        // steel frame
         for (const e of [-1, 1]) b.box(0.14, doorHeight, 0.14, steel, inner - side * 0.07, doorHeight / 2, dz + e * (doorWidth / 2 + 0.07));
-        // rubber seal pads outside + bumpers
         for (const e of [-1, 1]) {
           b.box(0.4, doorHeight + 0.4, 0.35, rubber, outer + side * 0.2, (doorHeight + 0.4) / 2, dz + e * (doorWidth / 2 + 0.05));
           b.box(0.16, 0.45, 0.3, rubber, outer + side * 0.08, 0.55, dz + e * 1.05);
         }
         b.box(0.4, 0.6, doorWidth + 0.8, rubber, outer + side * 0.2, doorHeight + 0.3, dz);
-        // sectional door: rolled up on the active dock, closed on the spare
         if (active) {
           b.add(uvBox(0.6, 0.55, doorWidth - 0.1, 1), doorMat, inner - side * 0.4, doorHeight - 0.32, dz);
           for (const e of [-1, 1]) b.box(2.4, 0.06, 0.06, steel, side * (HALF_W - 1.2), doorHeight - 0.05, dz + e * (doorWidth / 2 - 0.05));
         } else {
           b.add(unitBox, doorMat, side * (HALF_W + 0.02), doorHeight / 2, dz, 0, 0, 0, 0.08, doorHeight, doorWidth);
         }
-        // dock leveler with striped edges
         b.box(2.2, 0.05, doorWidth - 0.6, steel, side * (HALF_W - 1.1), 0.025, dz);
         for (const e of [-1, 1]) b.add(unitBox, this.hazardMat, side * (HALF_W - 1.1), 0.03, dz + e * (doorWidth / 2 - 0.25), 0, 0, 0, 2.2, 0.06, 0.14);
-        // yellow guard posts either side of the door
         for (const e of [-1, 1]) {
           const gz = dz + e * (doorWidth / 2 + 0.35);
           b.add(unitCylinder, this.hazardMat, side * (HALF_W - 0.45), 0.6, gz, 0, 0, 0, 0.24, 1.2, 0.24);
           this.collide(side * (HALF_W - 0.45), gz, 0.14, 0.14);
         }
-        // outside flood lamp
         b.box(0.06, 0.06, 0.8, housing, outer + side * 0.4, doorHeight + 1.0, dz);
         b.box(0.3, 0.14, 0.3, housing, outer + side * 0.75, doorHeight + 0.95, dz);
         b.box(0.26, 0.02, 0.26, glow(0xfff1c9), outer + side * 0.75, doorHeight + 0.87, dz);
 
-        // collider: doorway + where a docked trailer pokes in
         this.colliders.push({
           minX: Math.min(side * HALF_W - side * 1.7, side * HALF_W + side * 0.3),
           maxX: Math.max(side * HALF_W - side * 1.7, side * HALF_W + side * 0.3),
@@ -193,17 +241,15 @@ export class Warehouse {
           maxZ: dz + doorWidth / 2,
         });
 
-        // dock number sign above the door, facing inside
         const sign = new THREE.Mesh(
           new THREE.PlaneGeometry(1.9, 0.5),
           new THREE.MeshBasicMaterial({ map: textSprite(`DOCK ${idx + 1} · ${side < 0 ? 'IN' : 'OUT'}`, side < 0 ? '#2563b8' : '#c2571f', '#ffffff', 384, 100, 54) }),
         );
         sign.position.set(inner - side * 0.03, doorHeight + 0.75, dz);
         sign.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
-        this.group.add(sign);
+        this.docks.add(sign);
 
         if (active) {
-          // traffic light: red = no truck, green = docked
           const lx = side * (HALF_W - 0.2);
           const lz = dz - (doorWidth / 2 + 0.9);
           b.box(0.16, 0.46, 0.2, housing, lx, 2.2, lz);
@@ -214,11 +260,12 @@ export class Warehouse {
           r.position.set(lx - side * 0.09, 2.31, lz);
           const g = new THREE.Mesh(lampGeo, green);
           g.position.set(lx - side * 0.09, 2.09, lz);
-          this.group.add(r, g);
+          this.docks.add(r, g);
           this.dockLamps.set(side < 0 ? 'supplier' : 'customer', { red, green });
         }
       });
     }
+    this.docks.add(b.build());
   }
 
   setDockLight(kind: TruckKind, docked: boolean): void {
@@ -228,8 +275,9 @@ export class Warehouse {
     l.green.color.setHex(docked ? 0x35e06a : 0x1f3a26);
   }
 
-  // ---------- signs, bollards, extinguishers ----------
-  private buildSafety(b: MergeBuilder): void {
+  // ---------- signs, bollards, extinguishers, office desk, props ----------
+  private buildProps(): void {
+    const b = new MergeBuilder();
     const signMat = new THREE.MeshBasicMaterial({ map: signAtlasTexture() });
     const signGeos = new Map<SignKind, THREE.PlaneGeometry>();
     const sign = (kind: SignKind, x: number, y: number, z: number, ry: number, scale = 0.9): void => {
@@ -251,14 +299,12 @@ export class Warehouse {
       sign('speed', side * (HALF_W - 0.35), 3.2, 8.5, side < 0 ? Math.PI / 2 : -Math.PI / 2, 0.8);
     }
 
-    // personnel exit door in the north-east corner
     const doorX = 16.3;
     b.box(1.3, 2.35, 0.1, mat(0x2d333d, 0.6, 0.4), doorX, 1.175, -HALF_D + 0.05);
     b.box(1.05, 2.15, 0.12, mat(0x7c8796, 0.5, 0.3), doorX, 1.075, -HALF_D + 0.06);
     b.box(0.2, 0.04, 0.06, mat(0xd6dce2, 0.2, 0.9), doorX + 0.35, 1.05, -HALF_D + 0.14);
     sign('exit', doorX, 2.95, -HALF_D + 0.2, 0, 0.7);
 
-    // fire extinguishers on columns and walls
     const red = mat(0xc4221f, 0.35, 0.1);
     const black = mat(0x1c1c1c, 0.6);
     const ext = (x: number, z: number, ry: number): void => {
@@ -276,7 +322,6 @@ export class Warehouse {
     ext(-HALF_W + 0.33, -11, Math.PI / 2);
     ext(HALF_W - 0.33, 11, -Math.PI / 2);
 
-    // bollards: yellow with black stripes
     const bollard = (x: number, z: number): void => {
       b.add(unitCylinder, this.hazardMat, x, 0.5, z, 0, 0, 0, 0.26, 1.0, 0.26);
       b.add(unitSphere, mat(0x1c1c1c, 0.5), x, 1.0, z, 0, 0, 0, 0.26, 0.14, 0.26);
@@ -290,17 +335,11 @@ export class Warehouse {
     bollard(p.office.x - 1.7, HALF_D - 1.9);
     bollard(p.office.x + 1.7, HALF_D - 1.9);
     bollard(p.upgradeElectric.x + 3.6, HALF_D - 2.4);
-  }
 
-  // ---------- props: office desk, charger, pallets, wrapper, bins ----------
-  private buildProps(b: MergeBuilder): void {
-    const p = layout.pads;
     const desk = mat(0x9a7b52, 0.7);
     const dark = mat(0x23262c, 0.6);
     const grey = mat(0x8b939e, 0.5, 0.4);
     const deskZ = HALF_D - 1.0;
-
-    // office desk with monitor, keyboard, chair, cabinet, water cooler
     b.box(2.4, 0.06, 0.85, desk, p.office.x, 0.76, deskZ);
     for (const dx of [-1.1, 1.1]) b.box(0.06, 0.73, 0.8, grey, p.office.x + dx, 0.37, deskZ);
     b.box(0.7, 0.42, 0.04, dark, p.office.x - 0.3, 1.1, deskZ + 0.15);
@@ -315,16 +354,14 @@ export class Warehouse {
     b.box(0.35, 1.0, 0.35, mat(0xeef1f4, 0.4), p.office.x - 1.8, 0.5, deskZ);
     b.add(unitCylinder, mat(0x6fb6ea, 0.2, 0.1), p.office.x - 1.8, 1.2, deskZ, 0, 0, 0, 0.28, 0.4, 0.28);
     this.collide(p.office.x, deskZ, 2.1, 0.6);
-    // name plate lying on top of the parapet so it never hides the pad
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(2.4, 0.5),
       new THREE.MeshBasicMaterial({ map: textSprite('ORDERS & OFFICE', '#ffffff', '#23427c', 384, 80, 40) }),
     );
     board.position.set(p.office.x, layout.warehouse.southWallHeight + 0.12, HALF_D + T / 2);
     board.rotation.x = -Math.PI / 2 + 0.25;
-    this.group.add(board);
+    this.props.add(board);
 
-    // EV charger for the electric pompwagen
     const cx = p.upgradeElectric.x + 2.5;
     const cz = HALF_D - 0.5;
     b.box(0.6, 1.5, 0.35, mat(0xeef1f4, 0.4), cx, 0.75, cz);
@@ -333,7 +370,6 @@ export class Warehouse {
     b.add(new THREE.TorusGeometry(0.22, 0.03, 6, 12, Math.PI * 1.5), dark, cx + 0.34, 0.8, cz - 0.1, 0, Math.PI / 2, 0);
     this.collide(cx, cz, 0.4, 0.3);
 
-    // stacks of empty pallets between the inbound doors
     const wood = palletWoodMaterial();
     const pw = palletWoodGeometry();
     for (const [sz, n] of [[-1.6, 7], [0.1, 4], [1.7, 9]] as [number, number][]) {
@@ -341,7 +377,6 @@ export class Warehouse {
       this.collide(-HALF_W + 0.75, sz, 0.45, 0.65);
     }
 
-    // stretch-wrap machine on the outbound side
     const wx = HALF_W - 1.6;
     const wz = 0.2;
     b.add(unitCylinder, grey, wx, 0.06, wz, 0, 0, 0, 1.9, 0.12, 1.9);
@@ -352,19 +387,20 @@ export class Warehouse {
     b.box(0.3, 0.18, 0.02, glow(0x5aa9e6), wx + 1.1, 0.9, wz - 1.06);
     this.collide(wx, wz, 1.1, 1.1);
 
-    // wheelie bins in the south-west corner
     for (const [bx, col] of [[-HALF_W + 0.7, 0x2f7d45], [-HALF_W + 1.5, 0x7a7f87]] as [number, number][]) {
       b.box(0.62, 1.0, 0.7, mat(col, 0.7), bx, 0.5, HALF_D - 0.6);
       b.box(0.66, 0.06, 0.74, mat(col, 0.6), bx, 1.03, HALF_D - 0.62);
     }
     this.collide(-HALF_W + 1.1, HALF_D - 0.6, 0.8, 0.4);
+    this.props.add(b.build());
   }
 
-  // ---------- roof trusses + high-bay lamps (no shadows, merged) ----------
-  private buildCeiling(): THREE.Group {
+  // ---------- roof trusses + high-bay lamps (own materials so the cutaway can fade them) ----------
+  private buildCeiling(): void {
     const b = new MergeBuilder();
-    const steel = mat(0x6b7585, 0.6, 0.5);
-    const housing = mat(0xa3abb5, 0.4, 0.4);
+    const steel = new THREE.MeshStandardMaterial({ color: 0x6b7585, roughness: 0.6, metalness: 0.5, transparent: true });
+    const housing = new THREE.MeshStandardMaterial({ color: 0xa3abb5, roughness: 0.4, metalness: 0.4, transparent: true });
+    const lamp = new THREE.MeshBasicMaterial({ color: 0xfff1c9, transparent: true });
     const depth = 0.8;
     const panel = 1.5;
     const diag = Math.atan2(panel, depth);
@@ -380,14 +416,19 @@ export class Warehouse {
       for (const lx of LAMP_X) {
         b.add(unitCylinder, housing, lx, ROOF - depth - 0.25, tz, 0, 0, 0, 0.025, 0.5, 0.025);
         b.add(new THREE.CylinderGeometry(0.07, 0.22, 0.22, 12), housing, lx, ROOF - depth - 0.6, tz);
-        b.add(unitCylinder, glow(0xfff1c9), lx, ROOF - depth - 0.72, tz, 0, 0, 0, 0.4, 0.02, 0.4);
+        b.add(unitCylinder, lamp, lx, ROOF - depth - 0.72, tz, 0, 0, 0, 0.4, 0.02, 0.4);
       }
     }
-    return b.build(false, false);
+    // purlins along the roof
+    for (let x = -HALF_W + 3; x < HALF_W; x += 6) b.box(0.08, 0.08, D, steel, x, ROOF + 0.1, 0);
+    this.roof.add(b.build(false, false));
+    const box = new THREE.Box3(new THREE.Vector3(-HALF_W, ROOF - depth - 0.8, -HALF_D), new THREE.Vector3(HALF_W, ROOF + 0.2, HALF_D));
+    this.cutaway.add(box, [steel, housing, lamp], 0.08);
   }
 
-  /** hide roof trusses when zoomed in so they never cover the worker */
-  setCeilingVisible(visible: boolean): void {
-    this.ceiling.visible = visible;
+  /** fade walls/roof between the camera and the player */
+  update(dt: number, camera: THREE.Camera, target: THREE.Vector3): void {
+    if (!this.group.visible) return;
+    this.cutaway.update(dt, camera, target);
   }
 }

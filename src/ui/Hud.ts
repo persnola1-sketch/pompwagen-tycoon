@@ -7,6 +7,7 @@ export class Hud {
   private repEl: HTMLElement;
   private stockEl: HTMLElement;
   private overviewBtn: HTMLButtonElement;
+  private boardBadge: HTMLElement;
   onBoardToggle: (() => void) | null = null;
   onOverviewToggle: (() => void) | null = null;
 
@@ -20,13 +21,14 @@ export class Hud {
       `<div class="chip" id="stock-chip">📦 <span>0/0</span></div>` +
       `<div class="hud-btns">` +
       `<button id="overview-toggle" aria-label="Overview">🗺️</button>` +
-      `<button id="board-toggle">Orders ▾</button>` +
+      `<button id="board-toggle">📋<span class="badge" hidden>0</span></button>` +
       `</div>`;
     document.body.appendChild(hud);
     this.moneyEl = hud.querySelector('#money-chip span')!;
     this.repEl = hud.querySelector('#rep-chip')!;
     this.stockEl = hud.querySelector('#stock-chip span')!;
     this.overviewBtn = hud.querySelector('#overview-toggle')!;
+    this.boardBadge = hud.querySelector('#board-toggle .badge')!;
     hud.querySelector('#board-toggle')!.addEventListener('click', () => this.onBoardToggle?.());
     this.overviewBtn.addEventListener('click', () => this.onOverviewToggle?.());
 
@@ -45,6 +47,11 @@ export class Hud {
     this.moneyEl.textContent = Math.floor(state.money).toLocaleString('en');
     this.setRep(state.reputation);
     this.stockEl.textContent = `${state.stock}/${state.capacity}`;
+  }
+
+  setBoardCount(n: number): void {
+    this.boardBadge.hidden = n === 0;
+    this.boardBadge.textContent = String(n);
   }
 
   setOverview(on: boolean): void {
