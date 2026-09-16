@@ -464,7 +464,7 @@ export function plateTexture(text: string): THREE.CanvasTexture {
 }
 
 /** trailer side livery: company name on a colour swoosh */
-export function liveryTexture(name: string, primary: string, accent: string): THREE.CanvasTexture {
+export function liveryTexture(name: string, primary: string, accent: string, drawLogo?: (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) => void): THREE.CanvasTexture {
   const W = 1024;
   const H = 256;
   const [c, ctx] = canvas(W, H);
@@ -490,7 +490,9 @@ export function liveryTexture(name: string, primary: string, accent: string): TH
   ctx.font = '900 104px -apple-system, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(name, 48, H * 0.3, W - 96);
+  const logoW = drawLogo ? 130 : 0;
+  if (drawLogo) drawLogo(ctx, 44, H * 0.3 - 55, 110, primary);
+  ctx.fillText(name, 48 + logoW, H * 0.3, W - 96 - logoW);
   ctx.fillStyle = '#ffffff';
   ctx.font = '700 30px -apple-system, sans-serif';
   ctx.textAlign = 'right';

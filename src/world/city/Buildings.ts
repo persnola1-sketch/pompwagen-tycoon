@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import layout from '../../config/layout.json';
 import { MergeBuilder, glow, mat, unitBox, unitCylinder, uvBox } from '../Merge';
-import { corrugatedWallTexture, textSprite } from '../Textures';
+import { canvas, corrugatedWallTexture, textSprite, tex } from '../Textures';
+import { drawMark } from '../../ui/Logo';
 
 const C = layout.city;
 const EDGE = C.roadWidth / 2 + C.bikeLane + 0.25 + C.sidewalk;
@@ -9,6 +10,8 @@ const EDGE = C.roadWidth / 2 + C.bikeLane + 0.25 + C.sidewalk;
 export interface StoreBrand {
   name: string;
   color: string;
+  accent?: string;
+  mark?: string;
 }
 
 /** deterministic RNG so the city looks the same on every load */
@@ -86,6 +89,28 @@ export class Buildings {
     this.group.add(m);
   }
 
+  /** shop fascia: the brand mark next to its name */
+  private brandSign(b: StoreBrand, x: number, y: number, z: number, ry: number, w: number, h: number): void {
+    const W = 512;
+    const H = Math.round((W * h) / w);
+    const [c, ctx] = canvas(W, H);
+    ctx.fillStyle = b.color;
+    ctx.fillRect(0, 0, W, H);
+    const size = H * 0.8;
+    drawMark(ctx, b.mark ?? 'circle', 10, (H - size) / 2, size, b.accent ?? '#ffffff');
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.round(H * 0.62)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.name, size + 22, H / 2, W - size - 34);
+    const t = tex(c, 1);
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t }));
+    m.position.set(x, y, z);
+    m.rotation.y = ry;
+    this.group.add(m);
+  }
+
   /** a shop with a glass front, awning and a lit brand sign */
   private shop(x: number, z: number, facing: number, brand: StoreBrand): void {
     const b = this.b;
@@ -103,7 +128,7 @@ export class Buildings {
     // awning
     b.add(unitBox, trim, x + fx * (d / 2 + 0.7), 3.5, z + fz * (d / 2 + 0.7), 0.25 * fz, facing, -0.25 * fx, w - 1.2, 0.12, 1.6);
     b.box(w, 0.9, 0.2, trim, x + fx * (d / 2 + 0.05), 4.3, z + fz * (d / 2 + 0.05), facing);
-    this.sign(brand.name, brand.color, '#ffffff', x + fx * (d / 2 + 0.16), 4.3, z + fz * (d / 2 + 0.16), facing, w - 1.2, 0.85);
+    this.brandSign(brand, x + fx * (d / 2 + 0.16), 4.3, z + fz * (d / 2 + 0.16), facing, w - 1.2, 0.85);
     this.storeSpots.push({ name: brand.name, x: x + fx * (d / 2 + 3), z: z + fz * (d / 2 + 3) });
   }
 

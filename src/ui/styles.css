@@ -383,3 +383,7 @@ body.guiding #left-stack, body.overview #left-stack { opacity: 0; pointer-events
 #level-chip { color: #ffd75e; gap: 4px; }
 #level-chip .lvbar { display: block; width: 34px; height: 5px; background: rgba(255,255,255,0.18); border-radius: 3px; overflow: hidden; }
 #level-chip .lvbar b { display: block; height: 100%; width: 0; background: var(--accent); }
+.btag { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+.btag svg { border-radius: 5px; }
+.card .logo { background: none !important; padding: 0; }
+.panel-head .clients { background: rgba(255,255,255,0.1); border: none; color: #e8eaf0; border-radius: 10px; width: 32px; height: 32px; font-size: 14px; margin-right: 4px; }

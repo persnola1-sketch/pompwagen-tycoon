@@ -13,7 +13,8 @@ import { SceneRoot } from './world/Scene';
 import { AABB, Warehouse } from './world/Warehouse';
 import { Yard } from './world/Yard';
 import { City } from './world/city/City';
-import names from './config/names.json';
+import { CLIENTS, Loyalty } from './core/Brands';
+import { ClientsPanel } from './ui/ClientsPanel';
 import { Plot } from './world/Plot';
 import { WarehouseBuild } from './world/construction/WarehouseBuild';
 import { Racks, rowPadZ } from './world/Racks';
@@ -55,7 +56,9 @@ class Game {
   private bus = new EventBus();
   private state = new GameState(this.bus);
   private save = new SaveSystem(this.state);
-  private orders = new Orders(this.state, this.bus);
+  private loyalty = new Loyalty(this.bus);
+  private orders = new Orders(this.state, this.bus, this.loyalty);
+  private clientsPanel: ClientsPanel;
   private tutorial = new Tutorial(this.state, this.orders, this.bus);
   private workers = new Workers(this.state, this.bus);
   private quests = new Quests(this.state, this.workers, this.bus);
@@ -109,6 +112,7 @@ class Game {
   private lastTime = performance.now();
 
   constructor() {
+    this.save.register('clients', this.loyalty);
     this.save.register('workers', this.workers);
     this.save.register('timers', this.timers);
     this.save.register('quests', this.quests);
@@ -122,8 +126,7 @@ class Game {
     this.warehouse = new Warehouse();
     this.plot = new Plot();
     this.yard = new Yard();
-    const brandColors = ['#2563b8', '#c2571f', '#2f9e4f', '#8347c2', '#b83a63', '#3aa6a0', '#d6a21e', '#1f8a8a'];
-    this.city = new City(names.stores.map((n, i) => ({ name: n, color: brandColors[i % brandColors.length] })));
+    this.city = new City(CLIENTS.map((b) => ({ name: b.name, color: b.color, accent: b.accent, mark: b.mark })));
     scene.add(this.warehouse.group, this.plot.group, this.yard.group, this.city.group);
 
     this.racks = new Racks(this.state, this.warehouse.colliders);
@@ -150,7 +153,17 @@ class Game {
     this.hud = new Hud(this.state, this.bus);
     this.toasts = new Toasts(this.bus);
     this.popups = new Popups(this.orders, this.state, this.bus, this.sound);
+    this.popups.loyaltyLabel = (id): string => {
+      const l = this.loyalty.level(id);
+      return `${l.emoji} ${l.name}`;
+    };
+    this.clientsPanel = new ClientsPanel(this.loyalty, this.bus);
+    this.clientsPanel.onClose = (): void => this.sound.click();
     this.board = new OrderBoard(this.orders, this.state, this.bus);
+    this.board.onClients = (): void => {
+      this.sound.click();
+      this.clientsPanel.open();
+    };
     this.board.onCountChanged = (n): void => this.hud.setBoardCount(n);
     this.board.onClose = (): void => this.sound.click();
     this.dev = new DevPanel(this.state, this.save, this.root.renderer);
@@ -575,6 +588,11 @@ class Game {
       this.save.save();
     });
     this.bus.on('orderMissed', () => this.sound.error());
+    this.bus.on('loyaltyUp', ({ clientId, level }) => {
+      const name = CLIENTS.find((c) => c.id === clientId)?.name ?? 'A client';
+      this.bus.emit('toast', { text: `${name} is now a ${level} customer — they pay more!`, kind: 'unlock' });
+      this.sound.fanfare();
+    });
     this.guide.onTap = (): void => {
       this.sound.click();
       this.bus.emit('guideContinue', {});

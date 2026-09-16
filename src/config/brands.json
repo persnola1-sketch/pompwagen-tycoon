@@ -1,0 +1,30 @@
+{
+  "loyalty": {
+    "levels": [
+      { "id": "bronze", "name": "Bronze", "emoji": "🥉", "at": 0, "priceBonus": 0 },
+      { "id": "silver", "name": "Silver", "emoji": "🥈", "at": 6, "priceBonus": 0.04 },
+      { "id": "gold", "name": "Gold", "emoji": "🥇", "at": 16, "priceBonus": 0.08 }
+    ],
+    "onTimePoints": 1,
+    "missedPoints": -2,
+    "favouriteChance": 0.55
+  },
+  "clients": [
+    { "id": "freshmart", "name": "FreshMart", "color": "#2563b8", "accent": "#ffd23f", "mark": "cart", "contact": "Sanne de Vries", "favourites": ["water", "soda"] },
+    { "id": "quickshop", "name": "QuickShop", "color": "#c2571f", "accent": "#ffffff", "mark": "bolt", "contact": "Bram Jansen", "favourites": ["chips", "soda"] },
+    { "id": "buurtsuper", "name": "BuurtSuper", "color": "#2f9e4f", "accent": "#e9f7c9", "mark": "leaf", "contact": "Līga Bērziņa", "favourites": ["cannedFood", "toiletPaper"] },
+    { "id": "polderhal", "name": "Polderhal", "color": "#7b3fc2", "accent": "#ffd23f", "mark": "box", "contact": "Kees Mulder", "favourites": ["toiletPaper", "cleaning"] },
+    { "id": "citycorner", "name": "CityCorner", "color": "#b83a63", "accent": "#ffffff", "mark": "star", "contact": "Elīna Ozola", "favourites": ["soda", "chips"] },
+    { "id": "bikebite", "name": "BikeBite Café", "color": "#3aa6a0", "accent": "#fff4d6", "mark": "circle", "contact": "Jesse Bakker", "favourites": ["water", "chips"] },
+    { "id": "groenmarkt", "name": "Groen Markt", "color": "#4f8a2f", "accent": "#ffffff", "mark": "leaf", "contact": "Noor Visser", "favourites": ["cannedFood", "water"] },
+    { "id": "dagwinkel", "name": "Dagwinkel", "color": "#d6a21e", "accent": "#1b2230", "mark": "bag", "contact": "Mārtiņš Kalniņš", "favourites": ["cleaning", "toiletPaper"] }
+  ],
+  "suppliers": [
+    { "id": "vitalis", "name": "Vitalis Water", "color": "#2f8fd6", "accent": "#e6f6ff", "mark": "drop", "contact": "Anna Liepiņa", "products": ["water"] },
+    { "id": "sodawave", "name": "SodaWave", "color": "#d8342b", "accent": "#ffd23f", "mark": "wave", "contact": "Finn de Boer", "products": ["soda"] },
+    { "id": "crunchco", "name": "CrunchCo", "color": "#e2871d", "accent": "#fff1c9", "mark": "spark", "contact": "Lotte Smit", "products": ["chips"] },
+    { "id": "nordpaper", "name": "NordPaper", "color": "#6f7f92", "accent": "#ffffff", "mark": "box", "contact": "Uldis Krūmiņš", "products": ["toiletPaper"] },
+    { "id": "cando", "name": "CanDo Foods", "color": "#8a5a2b", "accent": "#ffe0a3", "mark": "circle", "contact": "Pieter Kuiper", "products": ["cannedFood"] },
+    { "id": "sparkclean", "name": "SparkClean", "color": "#1fa88f", "accent": "#f5f06a", "mark": "spark", "contact": "Zane Vītola", "products": ["cleaning"] }
+  ]
+}

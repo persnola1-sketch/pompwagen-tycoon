@@ -13,7 +13,7 @@ Tracks what is built per phase of `docs/update-v3.md`, so a new session can cont
 | 7 Conveyors | done | `world/Conveyor.ts` (polyline belts, scrolling texture, drums, instanced pallets, queueing), `game/Conveyors.ts` (inbound auto-stores into racks, outbound auto-loads the truck), pads gated on shipped count, built through construction timers, motor hum |
 | 8 Quests | done | `core/quests/*` (story chain, 3 daily with baselines + daily reset, achievements, timed client quests, company XP/levels), `core/Events.ts` (rush hour, inspection, VIP client, late supplier), `ui/QuestPanel.ts`, HUD level chip + tracked widget + claim badge, dev panel buttons |
 | 9 City | done | `world/city/*`: `Roads.ts` (ring + outer grid, bike lanes, kerbs, zebras, roundabout), `Buildings.ts` (Dutch terraces with gables, client shops with signs, offices, supermarket, petrol station, halls, parks), `Traffic.ts` (instanced cars/vans/bikes on lane loops, braking, traffic lights, gives way to trucks), `Pedestrians.ts`, `City.ts`; `Yard.ts` trimmed to the plot with animated gate barriers and a waving flag; optional day/night in `Scene.ts`
-| 10 Clients & brands | todo | |
+| 10 Clients & brands | done | `config/brands.json` (8 clients, 6 suppliers), `core/Brands.ts` (lookup + loyalty tiers bronze/silver/gold with price bonus), `ui/Logo.ts` (SVG + canvas marks), logos on order cards, order board, truck liveries, city shop fascias, `ui/ClientsPanel.ts` profiles with contact, favourites and history
 | 11 Shop menu | todo | |
 | 12 Ad hooks | todo | |
 | 13 Animations & effects | todo | |

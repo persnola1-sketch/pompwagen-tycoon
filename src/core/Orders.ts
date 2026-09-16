@@ -1,5 +1,5 @@
 import economy from '../config/economy.json';
-import names from '../config/names.json';
+import { Brand, Loyalty, brandByName, clientsFor, suppliersFor } from './Brands';
 import { CustomerOffer, EventBus, OrderLine, SupplierOffer, TruckKind } from './EventBus';
 import { GameState } from './GameState';
 import { PRODUCTS, ProductDef, product } from './Products';
@@ -45,7 +45,7 @@ export function customerTotals(o: CustomerOffer): CustomerTotals {
 }
 
 export function supplierNames(productId: string): string[] {
-  return (names.suppliers as Record<string, string[]>)[productId] ?? ['Groothandel BV'];
+  return suppliersFor(productId).map((s) => s.name);
 }
 
 /**
@@ -77,7 +77,7 @@ export class Orders {
   private clerkTimerS = 0;
   private clerkTimerC = 0;
 
-  constructor(private state: GameState, private bus: EventBus) {
+  constructor(private state: GameState, private bus: EventBus, private loyalty?: Loyalty) {
     for (const p of PRODUCTS) this.avgCost[p.id] = (p.buyMin + p.buyMax) / 2;
   }
 
@@ -185,8 +185,10 @@ export class Orders {
       pallets = Math.min(2, Math.max(1, this.state.freeSpace));
       price = Math.max(0, Math.floor(this.state.money / pallets));
     }
+    const brand = pick(suppliersFor(prod.id));
     this.offerSupplier({
-      supplier: pick(supplierNames(prod.id)),
+      supplier: brand.name,
+      supplierId: brand.id,
       product: prod.id,
       pallets,
       pricePerPallet: price,
@@ -217,7 +219,11 @@ export class Orders {
       if (second) picks.push(second);
     }
     const sizes = picks.length > 1 ? [Math.ceil(total / 2), Math.floor(total / 2)] : [total];
-    const repBonus = (1 + this.state.reputation * economy.reputation.priceBonusPerStar) * this.priceFactor;
+    const client = pick(Math.random() < 0.55 ? clientsFor(first.id) : clientsFor('')) as Brand;
+    const repBonus =
+      (1 + this.state.reputation * economy.reputation.priceBonusPerStar) *
+      this.priceFactor *
+      (1 + (this.loyalty?.bonus(client.id) ?? 0));
     const lines = picks
       .map((p, i) => ({
         product: p.id,
@@ -229,13 +235,14 @@ export class Orders {
       this.customerTimer = economy.customer.retryDelay;
       return;
     }
-    this.offerCustomer({ store: pick(names.stores), lines });
+    this.offerCustomer({ store: client.name, clientId: client.id, lines });
   }
 
-  offerSupplier(o: { supplier: string; product: string; pallets: number; pricePerPallet: number; free: boolean }): void {
+  offerSupplier(o: { supplier: string; supplierId?: string; product: string; pallets: number; pricePerPallet: number; free: boolean }): void {
     const offer: SupplierOffer = {
       id: this.nextId++,
       supplier: o.supplier,
+      supplierId: o.supplierId ?? brandByName(o.supplier)?.id ?? 'vitalis',
       product: o.product,
       pallets: o.pallets,
       pricePerPallet: o.free ? 0 : o.pricePerPallet,
@@ -249,7 +256,7 @@ export class Orders {
     this.bus.emit('ordersChanged', {});
   }
 
-  offerCustomer(o: { store: string; lines: { product: string; pallets: number; pricePerPallet: number }[] }): void {
+  offerCustomer(o: { store: string; clientId?: string; lines: { product: string; pallets: number; pricePerPallet: number }[] }): void {
     const lines: OrderLine[] = o.lines.map((l) => ({
       ...l,
       loaded: 0,
@@ -260,6 +267,7 @@ export class Orders {
     const offer: CustomerOffer = {
       id: this.nextId++,
       store: o.store,
+      clientId: o.clientId ?? brandByName(o.store)?.id ?? 'freshmart',
       lines,
       expiresIn: economy.customer.offerExpiry,
       deadline: total,
@@ -423,6 +431,7 @@ export class Orders {
     const fast = o.deadline > o.deadlineTotal * economy.customer.fastDeliveryFraction;
     const { revenue, profit } = this.settle(o);
     this.state.stats.ordersOnTime++;
+    this.loyalty?.finishOrder(o.clientId, true, o.lines.reduce((n, l) => n + l.loaded, 0), revenue);
     if (fast) this.state.addReputation(economy.customer.fastDeliveryRepBonus);
     this.bus.emit('orderShipped', { orderId: o.id, store: o.store, revenue, profit, fast });
     this.bus.emit('truckLeaving', { kind: 'customer', orderId: o.id });
@@ -432,7 +441,8 @@ export class Orders {
     const o = this.activeCustomer;
     if (!o) return;
     o.state = 'done';
-    this.settle(o);
+    const { revenue } = this.settle(o);
+    this.loyalty?.finishOrder(o.clientId, false, o.lines.reduce((n, l) => n + l.loaded, 0), revenue);
     this.state.addReputation(-economy.customer.missedRepPenalty);
     this.bus.emit('orderMissed', { orderId: o.id });
     this.bus.emit('truckLeaving', { kind: 'customer', orderId: o.id });

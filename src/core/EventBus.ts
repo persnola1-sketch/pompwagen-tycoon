@@ -45,6 +45,8 @@ export type GameEvents = {
   conveyorLoaded: { kind: 'in' | 'out'; product: string };
   conveyorDelivered: { kind: 'in' | 'out'; product: string; x: number; z: number };
   conveyorRunning: { running: boolean };
+  clientsChanged: Record<string, never>;
+  loyaltyUp: { clientId: string; level: string };
   questsChanged: Record<string, never>;
   questClaimed: { title: string; money: number; xp: number };
   companyXpChanged: { xp: number; level: number };
@@ -64,6 +66,8 @@ export type OrderState = 'offered' | 'accepted' | 'docked' | 'done';
 export interface SupplierOffer {
   id: number;
   supplier: string;
+  /** brand id from config/brands.json */
+  supplierId: string;
   /** product id (see config/products.json) */
   product: string;
   pallets: number;
@@ -86,6 +90,8 @@ export interface OrderLine {
 export interface CustomerOffer {
   id: number;
   store: string;
+  /** brand id from config/brands.json */
+  clientId: string;
   /** one line per product; mixed orders have two */
   lines: OrderLine[];
   expiresIn: number;

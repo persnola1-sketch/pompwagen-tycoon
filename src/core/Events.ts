@@ -1,5 +1,5 @@
 import cfg from '../config/quests.json';
-import names from '../config/names.json';
+import { CLIENTS } from './Brands';
 import { EventBus } from './EventBus';
 import { GameState } from './GameState';
 import { Orders } from './Orders';
@@ -83,7 +83,8 @@ export class Events {
     if (type.id === 'vip') {
       const products = this.state.unlocked;
       const product = pick(products);
-      const store = pick(names.stores);
+      const client = pick(CLIENTS);
+      const store = client.name;
       const pallets = Math.min(
         Math.max(type.minPallets ?? 6, Math.round((type.minPallets ?? 6) + Math.random() * ((type.maxPallets ?? 12) - (type.minPallets ?? 6)))),
         Math.max(3, this.state.capacity),
@@ -104,6 +105,7 @@ export class Events {
       // a matching order lands straight away at double pay
       this.orders.offerCustomer({
         store,
+        clientId: client.id,
         lines: [
           {
             product: product.id,

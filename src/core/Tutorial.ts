@@ -1,6 +1,6 @@
 import tutorialCfg from '../config/tutorial.json';
 import economy from '../config/economy.json';
-import names from '../config/names.json';
+import { CLIENTS } from './Brands';
 import { EventBus } from './EventBus';
 import { GameState } from './GameState';
 import { Orders, supplierNames } from './Orders';
@@ -114,7 +114,7 @@ export class Tutorial {
 
   private offerFirstOrder(): void {
     this.orders.offerCustomer({
-      store: names.stores[0],
+      store: CLIENTS[0].name,
       lines: [{ product: economy.tutorial.product, pallets: tutorialCfg.customerPallets, pricePerPallet: tutorialCfg.customerPricePerPallet }],
     });
   }
@@ -130,7 +130,7 @@ export class Tutorial {
       pallets: tutorialCfg.firstDeliveryPallets,
       needed: tutorialCfg.customerPallets,
       stock: this.state.stock,
-      store: names.stores[0],
+      store: CLIENTS[0].name,
       ...extra,
     };
     this.bus.emit('guideSay', {

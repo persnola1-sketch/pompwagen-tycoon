@@ -3,13 +3,18 @@ import { GameState } from '../core/GameState';
 import { Orders, customerTotals } from '../core/Orders';
 import { product } from '../core/Products';
 import { Sound } from '../audio/Sound';
+import { Brand, brand } from '../core/Brands';
+import { logoSvg } from './Logo';
 
-function logoColor(name: string): string {
-  const colors = ['#2563b8', '#c2571f', '#2f9e4f', '#8347c2', '#b83a63', '#3aa6a0'];
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return colors[h % colors.length];
+const FALLBACK: Brand = { id: 'x', name: '?', color: '#2563b8', accent: '#ffd23f', mark: 'circle', contact: '' };
+
+/** logo tile + name header used on every order card */
+export function brandHead(id: string, name: string, sub: string): string {
+  const b = brand(id) ?? FALLBACK;
+  return `<div class="head"><div class="logo">${logoSvg(b, 38)}</div>` +
+    `<div><div class="title">${esc(name)}</div><div class="sub">${esc(sub)}</div></div></div>`;
 }
+
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -31,6 +36,9 @@ export class Popups {
   private supplierExpiry = 1;
   private customerExpiry = 1;
 
+  /** set by the game so cards can show the client's loyalty tier */
+  loyaltyLabel: ((clientId: string) => string) | null = null;
+
   constructor(private orders: Orders, private state: GameState, bus: EventBus, private sound: Sound) {
     this.container = document.createElement('div');
     this.container.id = 'cards';
@@ -43,6 +51,11 @@ export class Popups {
     bus.on('customerOfferExpired', () => this.clearCustomer());
   }
 
+  private loyaltyNote(clientId: string): string {
+    const l = this.loyaltyLabel?.(clientId);
+    return l ? ` · ${l}` : '';
+  }
+
   private showSupplier(o: SupplierOffer): void {
     this.clearSupplier();
     const total = o.pallets * o.pricePerPallet;
@@ -53,10 +66,7 @@ export class Popups {
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
-      <div class="head">
-        <div class="logo" style="background:${logoColor(o.supplier)}">${esc(o.supplier[0])}</div>
-        <div><div class="title">${esc(o.supplier)}</div><div class="sub">Supplier delivery offer</div></div>
-      </div>
+      ${brandHead(o.supplierId, o.supplier, 'Supplier delivery offer')}
       <div class="row">${o.pallets} pallets of ${productChip(o.product)}</div>
       <div class="row">${o.free ? '<b class="stock-ok">FREE — first delivery!</b>' : `€${o.pricePerPallet}/pallet · total <b>€${total}</b> <span class="muted">(sells €${sell.sellMin}–${sell.sellMax})</span>`}</div>
       <div class="row">Free rack space: <span class="${fits ? 'stock-ok' : 'stock-bad'}">${free}${fits ? ' ✔' : ' ✖'}</span>${afford ? '' : ' · <span class="stock-bad">not enough money</span>'}</div>
@@ -98,10 +108,7 @@ export class Popups {
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
-      <div class="head">
-        <div class="logo" style="background:${logoColor(o.store)}">${esc(o.store[0])}</div>
-        <div><div class="title">${esc(o.store)}</div><div class="sub">Customer order${o.lines.length > 1 ? ' · mixed load' : ''}</div></div>
-      </div>
+      ${brandHead(o.clientId, o.store, `Customer order${o.lines.length > 1 ? ' · mixed load' : ''}${this.loyaltyNote(o.clientId)}`)}
       ${lines}
       <div class="row">Total <b>€${t.revenue}</b> · est. profit <b class="stock-ok">€${t.profit}</b></div>
       <div class="btns">

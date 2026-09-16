@@ -3,6 +3,13 @@ import { GameState } from '../core/GameState';
 import { Orders } from '../core/Orders';
 import { PRODUCTS, product } from '../core/Products';
 import { productChip } from './Popups';
+import { brand } from '../core/Brands';
+import { logoSvg } from './Logo';
+
+const tag = (id: string, name: string): string => {
+  const b = brand(id);
+  return b ? `<span class="btag">${logoSvg(b, 18)}<b>${name}</b></span>` : `<b>${name}</b>`;
+};
 
 /**
  * Collapsible order board: active deliveries and orders (per product:
@@ -15,17 +22,19 @@ export class OrderBoard {
   private stockEl: HTMLElement;
   onCountChanged: ((n: number) => void) | null = null;
   onClose: (() => void) | null = null;
+  onClients: (() => void) | null = null;
 
   constructor(private orders: Orders, private state: GameState, bus: EventBus) {
     this.el = document.createElement('div');
     this.el.id = 'order-board';
     this.el.className = 'ui panel';
     this.el.innerHTML =
-      `<div class="panel-head"><h3>Order board</h3><button class="close" aria-label="Close">✕</button></div>` +
+      `<div class="panel-head"><h3>Order board</h3><div><button class="clients" title="Clients">👥</button><button class="close" aria-label="Close">✕</button></div></div>` +
       `<div class="list"></div><h3>Stock</h3><div class="stock-list"></div>`;
     document.body.appendChild(this.el);
     this.listEl = this.el.querySelector('.list')!;
     this.stockEl = this.el.querySelector('.stock-list')!;
+    this.el.querySelector('.clients')!.addEventListener('click', () => this.onClients?.());
     this.el.querySelector('.close')!.addEventListener('click', () => {
       this.close();
       this.onClose?.();
@@ -71,7 +80,7 @@ export class OrderBoard {
     if (s) {
       const done = s.pallets - s.remaining;
       const status = s.state === 'accepted' ? 'truck on the way' : `${done}/${s.pallets} unloaded`;
-      rows.push(`<div class="board-item">📥 <b>${s.supplier}</b><br>${productChip(s.product)} — ${status}</div>`);
+      rows.push(`<div class="board-item">📥 ${tag(s.supplierId, s.supplier)}<br>${productChip(s.product)} — ${status}</div>`);
     }
     const c = this.orders.activeCustomer;
     if (c) {
@@ -79,7 +88,7 @@ export class OrderBoard {
       const warn = c.deadline < c.deadlineTotal * 0.25 ? 'warn' : '';
       const status = c.state === 'accepted' ? '<span class="muted">truck on the way</span><br>' : '';
       const lines = c.lines.map((l) => `${productChip(l.product)} ${l.loaded}/${l.pallets}`).join('<br>');
-      rows.push(`<div class="board-item">📤 <b>${c.store}</b><br>${status}${lines}<br><span class="t ${warn}">⏱ ${t}s left</span></div>`);
+      rows.push(`<div class="board-item">📤 ${tag(c.clientId, c.store)}<br>${status}${lines}<br><span class="t ${warn}">⏱ ${t}s left</span></div>`);
     }
     const p1 = this.orders.pendingSupplier;
     if (p1) rows.push(`<div class="board-item">💬 Offer: ${p1.supplier}, ${p1.pallets}× ${product(p1.product).name}</div>`);

@@ -7,6 +7,8 @@ import { MergeBuilder, glow, mat, unitBox, unitCylinder } from './Merge';
 import { PALLET_TOP, palletWoodGeometry, palletWoodMaterial } from './Pallet';
 import { LoadInstances } from './ProductVisuals';
 import { liveryTexture, plateTexture, textSprite } from './Textures';
+import { brandByName } from '../core/Brands';
+import { drawMark } from '../ui/Logo';
 
 const T = layout.truck;
 const TRAILER_LEN = 9.0;
@@ -235,10 +237,13 @@ export class Truck {
   }
 
   private applyCompany(name: string): void {
-    const [primary, accent] = LIVERIES[hash(name) % LIVERIES.length];
+    const b = brandByName(name);
+    const [fallbackPrimary, fallbackAccent] = LIVERIES[hash(name) % LIVERIES.length];
+    const primary = b ? parseInt(b.color.slice(1), 16) : fallbackPrimary;
+    const accent = b ? b.accent : fallbackAccent;
     this.paint.color.setHex(primary);
     this.liveryMat.map?.dispose();
-    this.liveryMat.map = liveryTexture(name, hex(primary), accent);
+    this.liveryMat.map = liveryTexture(name, hex(primary), accent, b ? (ctx, x, y, size, color) => drawMark(ctx, b.mark, x, y, size, color) : undefined);
     this.liveryMat.needsUpdate = true;
     const h = hash(name + this.kind);
     const letters = 'BDFGHJKLNPRSTVXZ';
