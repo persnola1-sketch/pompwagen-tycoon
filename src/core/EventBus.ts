@@ -46,6 +46,7 @@ export type GameEvents = {
   conveyorDelivered: { kind: 'in' | 'out'; product: string; x: number; z: number };
   conveyorRunning: { running: boolean };
   clientsChanged: Record<string, never>;
+  shopChanged: Record<string, never>;
   loyaltyUp: { clientId: string; level: string };
   questsChanged: Record<string, never>;
   questClaimed: { title: string; money: number; xp: number };

@@ -387,3 +387,61 @@ body.guiding #left-stack, body.overview #left-stack { opacity: 0; pointer-events
 .btag svg { border-radius: 5px; }
 .card .logo { background: none !important; padding: 0; }
 .panel-head .clients { background: rgba(255,255,255,0.1); border: none; color: #e8eaf0; border-radius: 10px; width: 32px; height: 32px; font-size: 14px; margin-right: 4px; }
+
+/* ---------- bottom navigation ---------- */
+#bottom-nav {
+  left: 0; right: 0; bottom: 0; z-index: 60;
+  display: flex; justify-content: center; gap: 2px;
+  background: rgba(16, 20, 30, 0.94); border-top: 1px solid var(--panel-border);
+  padding: 6px 4px calc(var(--safe-bottom) + 6px);
+  box-shadow: 0 -4px 18px rgba(0,0,0,0.4);
+}
+#bottom-nav button {
+  flex: 1; max-width: 96px; background: none; border: none; color: #aeb5c2;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 2px; border-radius: 12px; min-height: 52px;
+}
+#bottom-nav button.on { color: var(--accent); background: rgba(255,176,32,0.14); }
+#bottom-nav .nemoji { position: relative; font-size: 21px; line-height: 1; }
+#bottom-nav .nlabel { font-size: 10px; font-weight: 800; letter-spacing: 0.2px; }
+#bottom-nav .badge { top: -6px; right: -10px; }
+/* everything anchored to the bottom sits above the nav bar */
+.sheet { bottom: calc(66px + var(--safe-bottom)); border-radius: 20px 20px 0 0; padding-bottom: 0; }
+#guide { bottom: calc(var(--safe-bottom) + 78px); }
+#left-stack { bottom: calc(var(--safe-bottom) + 76px); }
+#toasts { bottom: calc(var(--safe-bottom) + 180px); }
+#dev-panel { bottom: calc(var(--safe-bottom) + 62px); }
+
+/* ---------- shop ---------- */
+.shop-tabname { padding: 0 14px 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.6; }
+.shop-card {
+  display: flex; gap: 10px; align-items: center;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border);
+  border-radius: 14px; padding: 10px; margin-bottom: 8px;
+}
+.shop-card.locked { opacity: 0.55; }
+.shop-card.owned { border-color: rgba(56,209,94,0.4); }
+.shop-card .sicon {
+  width: 46px; height: 46px; flex-shrink: 0; border-radius: 12px;
+  background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.shop-card .name { font-weight: 800; font-size: 14px; }
+.shop-card .sdesc { font-size: 12px; opacity: 0.8; line-height: 1.35; }
+.shop-card .meta { font-size: 11px; opacity: 0.65; margin-top: 3px; }
+.shop-card button { flex-shrink: 0; min-width: 86px; }
+
+/* ---------- pickers ---------- */
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 46px; height: 46px; border-radius: 12px; border: 2px solid transparent !important; padding: 0; }
+.swatch.on { border-color: #ffffff !important; box-shadow: 0 0 0 2px var(--accent); }
+.swatch.mark { background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; }
+.nameInput {
+  width: 100%; background: #1b2230; color: #fff; border: 1px solid var(--panel-border);
+  border-radius: 12px; padding: 12px; font-size: 16px; font-weight: 700;
+}
+
+/* ---------- map ---------- */
+#map-panel canvas { width: 100%; height: auto; border-radius: 14px; background: #20301f; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px 2px 0; font-size: 11px; }
+.map-legend span { display: flex; align-items: center; gap: 4px; }
+.map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }

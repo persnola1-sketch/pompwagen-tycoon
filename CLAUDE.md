@@ -10,7 +10,7 @@ Read `docs/game-design.md` (what to build) and `docs/mvp-plan.md` (how to build 
 - Keep files small and focused; one system per file.
 - After each feature: `npm run build` and fix every error before moving on.
 - Performance budget: 60 fps target on mid-range phones, one shadow light, pixel ratio capped at 2, shared geometries/materials, textures ≤ 1024².
-- Fictional brand names only (suppliers/stores from `src/config/names.json`).
+- Fictional brand names only (clients and suppliers live in `src/config/brands.json`).
 - The old one-shot prototype is `reference/index.html` — reference only, never import from it.
 
 ## Commands

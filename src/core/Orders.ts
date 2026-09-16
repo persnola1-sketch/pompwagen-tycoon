@@ -279,11 +279,15 @@ export class Orders {
     this.bus.emit('ordersChanged', {});
   }
 
+  private get dockFactor(): number {
+    return this.state.secondDock ? 0.7 : 1;
+  }
+
   private resetSupplierTimer(): void {
-    this.supplierTimer = rand(economy.supplier.offerIntervalMin, economy.supplier.offerIntervalMax) * this.intervalFactor;
+    this.supplierTimer = rand(economy.supplier.offerIntervalMin, economy.supplier.offerIntervalMax) * this.intervalFactor * this.dockFactor;
   }
   private resetCustomerTimer(): void {
-    this.customerTimer = rand(economy.customer.offerIntervalMin, economy.customer.offerIntervalMax) * this.intervalFactor;
+    this.customerTimer = rand(economy.customer.offerIntervalMin, economy.customer.offerIntervalMax) * this.intervalFactor * this.dockFactor;
   }
 
   // ---------- accept / decline ----------

@@ -1,7 +1,7 @@
 import economy from '../config/economy.json';
 import layout from '../config/layout.json';
 import { EventBus } from './EventBus';
-import { PRODUCTS, ProductDef, unlockedProducts } from './Products';
+import { PRODUCTS, ProductDef } from './Products';
 
 export const SAVE_VERSION = 3;
 const R = layout.rackRows;
@@ -38,6 +38,24 @@ export interface Stats {
 
 export const EMPTY_STATS: Stats = { shipped: 0, earned: 0, spent: 0, workerMoved: 0, ordersDone: 0, ordersOnTime: 0, unloaded: 0 };
 
+export interface Cosmetics {
+  companyName: string;
+  logoMark: string;
+  logoColor: string;
+  vest: string;
+  paint: string;
+  walls: string;
+}
+
+export const DEFAULT_COSMETICS: Cosmetics = {
+  companyName: 'Pompwagen BV',
+  logoMark: 'box',
+  logoColor: '#ff7a1a',
+  vest: '#ff7a1a',
+  paint: '#d9651f',
+  walls: '#dde3ea',
+};
+
 export interface Settings {
   henkTips: boolean;
   sound: boolean;
@@ -67,6 +85,10 @@ export interface SaveData {
   conveyorSpeedLevel?: number;
   companyXp?: number;
   companyLevel?: number;
+  secondDock?: boolean;
+  lighting?: boolean;
+  licences?: string[];
+  cosmetics?: Cosmetics;
   /** unlocked upper levels per rack row (0–2) */
   upperLevels?: number[];
   padProgress: Record<string, number>;
@@ -92,6 +114,11 @@ export class GameState {
   conveyorSpeedLevel = 0;
   companyXp = 0;
   companyLevel = 1;
+  secondDock = false;
+  lighting = false;
+  /** products unlocked by buying a licence in the shop */
+  licences: string[] = [];
+  cosmetics: Cosmetics = { ...DEFAULT_COSMETICS };
   upperLevels: number[] = new Array(ROWS).fill(0);
   stats: Stats = { ...EMPTY_STATS };
 
@@ -139,7 +166,7 @@ export class GameState {
   }
 
   get unlocked(): ProductDef[] {
-    return unlockedProducts(this.stats.shipped);
+    return PRODUCTS.filter((p) => this.stats.shipped >= p.unlockShipped || this.licences.includes(p.id));
   }
 
   addMoney(delta: number): void {
@@ -189,6 +216,10 @@ export class GameState {
       conveyorSpeedLevel: this.conveyorSpeedLevel,
       companyXp: this.companyXp,
       companyLevel: this.companyLevel,
+      secondDock: this.secondDock,
+      lighting: this.lighting,
+      licences: [...this.licences],
+      cosmetics: { ...this.cosmetics },
       upperLevels: [...this.upperLevels],
       settings: { ...this.settings },
       tipsSeen: [...this.tipsSeen],
@@ -217,6 +248,10 @@ export class GameState {
     this.conveyorSpeedLevel = d.conveyorSpeedLevel ?? 0;
     this.companyXp = d.companyXp ?? 0;
     this.companyLevel = Math.max(1, d.companyLevel ?? 1);
+    this.secondDock = d.secondDock ?? false;
+    this.lighting = d.lighting ?? false;
+    this.licences = d.licences ?? [];
+    this.cosmetics = { ...DEFAULT_COSMETICS, ...(d.cosmetics ?? {}) };
     this.vehicle = d.vehicle === 'forklift' && this.forklift ? 'forklift' : 'pompwagen';
     this.upperLevels = new Array(ROWS).fill(0).map((_, i) => Math.min(LEVELS - 1, d.upperLevels?.[i] ?? 0));
   }

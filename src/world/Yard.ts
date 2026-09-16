@@ -135,10 +135,8 @@ export class Yard {
     b.box(3.02, 0.8, 2.62, mat(0x24394d, 0.1, 0.7), hx, 1.75, hz);
     b.box(3.6, 0.18, 3.2, mat(0x2d333d, 0.6), hx, 2.7, hz);
     b.box(0.9, 1.9, 0.04, mat(0x7c8796, 0.5), hx - 0.6, 0.95, hz - 1.31);
-    const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.6, 0.55),
-      new THREE.MeshBasicMaterial({ map: textSprite('GATE · CHECK-IN', '#23427c', '#ffffff', 384, 80, 44) }),
-    );
+    this.signMat = new THREE.MeshBasicMaterial({ map: textSprite('GATE · CHECK-IN', '#23427c', '#ffffff', 384, 80, 44) });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.55), this.signMat);
     sign.position.set(hx, 3.1, hz + 1.3);
     this.group.add(sign);
     // company flag by the gate
@@ -149,6 +147,17 @@ export class Yard {
   }
 
   private flag: THREE.Mesh | null = null;
+  private signMat: THREE.MeshBasicMaterial | null = null;
+
+  /** the company's name on the gate sign and its colour on the flag */
+  setCompany(name: string, color: string): void {
+    if (this.signMat) {
+      this.signMat.map?.dispose();
+      this.signMat.map = textSprite(name.toUpperCase(), color, '#ffffff', 384, 80, 40);
+      this.signMat.needsUpdate = true;
+    }
+    if (this.flag) (this.flag.material as THREE.MeshStandardMaterial).color.set(color);
+  }
 
   // ---------- floodlights ----------
   private buildLights(b: MergeBuilder): void {

@@ -187,6 +187,16 @@ export class Construction {
         });
         break;
       }
+      case 'secondDock':
+        this.state.secondDock = true;
+        this.bus.emit('upgradeBought', { upgrade: 'secondDock' });
+        this.bus.emit('toast', { text: 'Second dock door open — trucks turn around faster', kind: 'good' });
+        break;
+      case 'lighting':
+        this.state.lighting = true;
+        this.bus.emit('upgradeBought', { upgrade: 'lighting' });
+        this.bus.emit('toast', { text: 'LED lighting installed — the team works faster', kind: 'good' });
+        break;
       case 'coffeeMachine':
         this.workers.coffeeMachine = true;
         this.bus.emit('upgradeBought', { upgrade: 'coffeeMachine' });

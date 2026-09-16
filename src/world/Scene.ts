@@ -59,6 +59,12 @@ export class SceneRoot {
     this.onResize();
   }
 
+  /** the LED lighting upgrade brightens the hall */
+  setBrightInterior(on: boolean): void {
+    this.ambient.intensity = on ? 0.55 : 0.35;
+    this.hemi.intensity = on ? 1.5 : 1.25;
+  }
+
   get camera(): THREE.PerspectiveCamera {
     return this.rig.camera;
   }

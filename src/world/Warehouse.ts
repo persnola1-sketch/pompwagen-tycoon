@@ -264,6 +264,11 @@ export class Warehouse {
     this.docks.add(b.build());
   }
 
+  /** repaint the cladding (shop cosmetics) */
+  setWallColor(hex: string): void {
+    for (const m of this.wallMats) m.color.set(hex);
+  }
+
   setDockLight(kind: TruckKind, docked: boolean): void {
     const l = this.dockLamps.get(kind);
     if (!l) return;

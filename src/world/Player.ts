@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import layout from '../config/layout.json';
 import { AABB } from './Warehouse';
-import { Character, DEFAULT_LOOK } from './Character';
+import { Character, CharacterLook, DEFAULT_LOOK } from './Character';
 import { Forklift } from './Forklift';
 import { Pompwagen, resolveCircle } from './Pompwagen';
 
@@ -25,18 +25,43 @@ export class Player {
   frozen = false;
   vehicle: VehicleKind = 'pompwagen';
 
-  readonly character = new Character(DEFAULT_LOOK);
-  readonly pompwagen: Pompwagen;
-  readonly forklift = new Forklift();
+  character = new Character(DEFAULT_LOOK);
+  pompwagen: Pompwagen;
+  forklift = new Forklift();
   private steer = 0;
+  private look: CharacterLook = { ...DEFAULT_LOOK };
+  private paint = 0xd9651f;
+  private parent: THREE.Object3D;
 
   constructor(parent: THREE.Object3D) {
     this.x = layout.playerStart.x;
     this.z = layout.playerStart.z;
+    this.parent = parent;
     this.pompwagen = new Pompwagen(this.x, this.z);
     this.forklift.group.visible = false;
     this.group.add(this.character.group, this.pompwagen.group, this.forklift.group);
     parent.add(this.group);
+  }
+
+  /** repaint the boss and their machines (shop cosmetics) */
+  applyCosmetics(vest: number, paint: number, electric: boolean, forkliftOwned: boolean): void {
+    if (vest === this.look.vest && paint === this.paint) return;
+    const cargo = [...this.cargo];
+    const mode = this.vehicle;
+    this.group.remove(this.character.group, this.pompwagen.group, this.forklift.group);
+    this.look = { ...this.look, vest };
+    this.paint = paint;
+    this.character = new Character(this.look);
+    this.pompwagen = new Pompwagen(this.x, this.z, paint);
+    this.forklift = new Forklift(paint);
+    this.vehicle = 'pompwagen';
+    this.group.add(this.character.group, this.pompwagen.group, this.forklift.group);
+    this.pompwagen.setElectric(electric);
+    this.setForkliftOwned(forkliftOwned);
+    this.pompwagen.reset(this.x, this.z, this.heading);
+    if (mode === 'forklift' && forkliftOwned) this.setVehicle('forklift');
+    this.setCargo(cargo);
+    void this.parent;
   }
 
   setElectric(on: boolean): void {

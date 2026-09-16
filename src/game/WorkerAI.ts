@@ -453,7 +453,7 @@ export class WorkerAI {
           if (!a.path.length) this.arrive(a);
         } else {
           moving = true;
-          let mul = speedMultiplier(w, a.cargo.length > 0, night);
+          let mul = speedMultiplier(w, a.cargo.length > 0, night) * (this.state.lighting ? 1.08 : 1);
           if (dist(a, player) < cfg.supervisorRadius) mul *= 1 + cfg.supervisorBoost;
           for (const o of this.agents) {
             if (o === a) continue;

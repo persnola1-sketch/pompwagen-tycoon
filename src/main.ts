@@ -15,6 +15,12 @@ import { Yard } from './world/Yard';
 import { City } from './world/city/City';
 import { CLIENTS, Loyalty } from './core/Brands';
 import { ClientsPanel } from './ui/ClientsPanel';
+import { Shop } from './game/Shop';
+import { ShopPanel } from './ui/ShopPanel';
+import { BottomNav, NavId } from './ui/BottomNav';
+import { MapDot, MapPanel } from './ui/MapPanel';
+import { logoSvg } from './ui/Logo';
+import shopCfg from './config/shop.json';
 import { Plot } from './world/Plot';
 import { WarehouseBuild } from './world/construction/WarehouseBuild';
 import { Racks, rowPadZ } from './world/Racks';
@@ -64,6 +70,11 @@ class Game {
   private quests = new Quests(this.state, this.workers, this.bus);
   private events = new Events(this.state, this.orders, this.quests, this.bus);
   private questPanel: QuestPanel;
+  private shop: Shop;
+  private shopPanel: ShopPanel;
+  private nav = new BottomNav();
+  private mapPanel = new MapPanel();
+  private rushLeft = 0;
   private eventBanner: HTMLElement | null = null;
   private timers = new Timers(this.bus);
   private construction: Construction;
@@ -194,6 +205,14 @@ class Game {
       this.sound.click();
       this.workersPanel.toggle();
     };
+    this.shop = new Shop(this.state, this.bus, this.timers, this.workers);
+    this.shopPanel = new ShopPanel(this.shop, this.state, this.bus);
+    this.shopPanel.onClose = (): void => this.closePanels();
+    this.shopPanel.onBuy = (id): void => {
+      if (this.shop.buy(id)) this.sound.coin();
+      else this.sound.error();
+      this.save.save();
+    };
     this.timersHud = new TimersHud(this.timers);
     this.questPanel = new QuestPanel(this.quests, this.state, this.bus);
     this.questPanel.onClose = (): void => this.sound.click();
@@ -232,6 +251,8 @@ class Game {
         this.timersHud.render();
       this.questPanel.tick();
       this.questRefresh?.();
+      this.navBadges?.();
+      this.mapPanel.draw();
       const ev = this.events.active;
       if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
       });
@@ -251,6 +272,8 @@ class Game {
       this.timersHud.render();
       this.questPanel.tick();
       this.questRefresh?.();
+      this.navBadges?.();
+      this.mapPanel.draw();
       const ev = this.events.active;
       if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
       this.save.save();
@@ -259,11 +282,15 @@ class Game {
       this.timersHud.render();
       this.questPanel.tick();
       this.questRefresh?.();
+      this.navBadges?.();
+      this.mapPanel.draw();
       const ev = this.events.active;
       if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
       this.save.save();
     });
     this.wireEvents();
+    this.wireShop();
+    this.wireNav();
 
     // fresh game: empty plot; otherwise the warehouse is up and running
     const built = this.state.warehouseBuilt;
@@ -382,6 +409,140 @@ class Game {
     this.bus.emit('warehouseBuilt', {});
     if (this.state.tutorialDone) this.orders.startAuto();
     this.save.save();
+  }
+
+  /** one panel at a time, driven by the bottom navigation */
+  private openPanel(id: NavId | null): void {
+    const map: Record<NavId, { isOpen: boolean; open: () => void; close: () => void }> = {
+      shop: this.shopPanel,
+      workers: this.workersPanel,
+      quests: this.questPanel,
+      orders: { isOpen: this.board.isOpen, open: () => this.board.open(), close: () => this.board.close() },
+      map: this.mapPanel,
+    };
+    const already = id ? map[id].isOpen : false;
+    for (const [key, p] of Object.entries(map)) {
+      if (key !== id && p.isOpen) p.close();
+    }
+    this.clientsPanel.close();
+    if (id && !already) map[id].open();
+    this.nav.setActive(id && !already ? id : null);
+  }
+
+  private closePanels(): void {
+    this.nav.setActive(null);
+  }
+
+  private wireNav(): void {
+    this.nav.onSelect = (id): void => {
+      this.sound.click();
+      this.openPanel(id);
+    };
+    this.mapPanel.onClose = (): void => this.closePanels();
+    this.mapPanel.stores = this.city.buildings.storeSpots;
+    this.mapPanel.dots = (): MapDot[] => {
+      const dots: MapDot[] = [{ x: this.player.x, z: this.player.z, color: '#ffb020', size: 7, label: 'You' }];
+      for (const a of this.workerAI.list) dots.push({ x: a.x, z: a.z, color: '#38d15e', size: 5 });
+      if (this.supplierTruck.phase !== 'hidden') {
+        dots.push({ x: this.supplierTruck.group.position.x, z: this.supplierTruck.group.position.z, color: '#7ec8ff', size: 7 });
+      }
+      if (this.customerTruck.phase !== 'hidden') {
+        dots.push({ x: this.customerTruck.group.position.x, z: this.customerTruck.group.position.z, color: '#ff9a5a', size: 7 });
+      }
+      return dots;
+    };
+    const badges = (): void => {
+      this.nav.setBadge('quests', this.quests.claimable);
+      this.nav.setBadge('workers', this.workers.candidates.filter((c) => c.hireCost <= this.state.money).length);
+      this.nav.setBadge('orders', this.board.count);
+      this.nav.setBadge('shop', this.shop.affordableCount);
+    };
+    badges();
+    this.navBadges = badges;
+    for (const ev of ['questsChanged', 'workersChanged', 'ordersChanged', 'shopChanged', 'moneyChanged'] as const) {
+      this.bus.on(ev, badges);
+    }
+  }
+
+  private navBadges: (() => void) | null = null;
+
+  /** shop actions that need world objects */
+  private wireShop(): void {
+    this.shop.onProduct = (id): void => {
+      if (!this.state.licences.includes(id)) this.state.licences.push(id);
+      this.bus.emit('productUnlocked', { product: id });
+      this.bus.emit('stockChanged', { stock: this.state.stock, capacity: this.state.capacity });
+    };
+    this.shop.onTemp = (free): void => {
+      if (!free) {
+        this.workers.hireTemp(true);
+        return;
+      }
+      void this.ads.showRewarded('a free temp worker').then((ok) => {
+        if (ok) this.workers.hireTemp(true);
+      });
+    };
+    this.shop.onRush = (free): void => {
+      const start = (): void => {
+        this.rushLeft = shopCfg.rushBoost.seconds;
+        this.bus.emit('toast', { text: '🏃 Rush boost! You are flying for a minute', kind: 'good' });
+        this.sound.fanfare();
+      };
+      if (!free) start();
+      else void this.ads.showRewarded('a free rush boost').then((ok) => ok && start());
+    };
+    this.shop.onFinishAll = (): void => {
+      void this.ads.showRewarded('finishing every timer').then((ok) => {
+        if (!ok) return;
+        this.timers.finishAll();
+        this.timersHud.render();
+      });
+    };
+    this.shop.onCosmetic = (kind): void => this.pickCosmetic(kind);
+    this.bus.on('jobDone', ({ job }) => {
+      if (job.item === 'lighting') this.root.setBrightInterior(true);
+    });
+    this.root.setBrightInterior(this.state.lighting);
+    this.applyCosmetics();
+  }
+
+  /** open the right picker for a cosmetic item and apply the result */
+  private pickCosmetic(kind: string): void {
+    const c = ShopPanel.cosmetics;
+    const cos = this.state.cosmetics;
+    const done = (): void => {
+      this.applyCosmetics();
+      this.save.save();
+      this.sound.click();
+    };
+    if (kind === 'company') {
+      ShopPanel.companyBuilder(cos, c.marks, c.logoColors, (mark, color) => logoSvg({ id: 'x', name: '', color, accent: '#ffffff', mark, contact: '' }, 34), (name, mark, color) => {
+        cos.companyName = name;
+        cos.logoMark = mark;
+        cos.logoColor = color;
+        done();
+      });
+      return;
+    }
+    const map: Record<string, { title: string; colors: string[]; get: () => string; set: (v: string) => void }> = {
+      vest: { title: 'Vest colour', colors: c.vest, get: () => cos.vest, set: (v) => (cos.vest = v) },
+      paint: { title: 'Vehicle paint', colors: c.paint, get: () => cos.paint, set: (v) => (cos.paint = v) },
+      walls: { title: 'Wall colour', colors: c.walls, get: () => cos.walls, set: (v) => (cos.walls = v) },
+    };
+    const m = map[kind];
+    if (!m) return;
+    ShopPanel.pickColor(m.title, m.colors, m.get(), (v) => {
+      m.set(v);
+      done();
+    });
+  }
+
+  private applyCosmetics(): void {
+    const c = this.state.cosmetics;
+    const hex = (s: string): number => parseInt(s.slice(1), 16);
+    this.player.applyCosmetics(hex(c.vest), hex(c.paint), this.state.electric, this.state.forklift);
+    this.warehouse.setWallColor(c.walls);
+    this.yard.setCompany(c.companyName, c.logoColor);
   }
 
   private wireQuests(): void {
@@ -737,6 +898,8 @@ class Game {
       this.timersHud.render();
       this.questPanel.tick();
       this.questRefresh?.();
+      this.navBadges?.();
+      this.mapPanel.draw();
       const ev = this.events.active;
       if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
     }
@@ -748,6 +911,11 @@ class Game {
     }
 
     this.clock += dt;
+    if (this.rushLeft > 0) {
+      this.rushLeft -= dt;
+      if (this.rushLeft <= 0) this.bus.emit('toast', { text: 'Rush boost over', kind: 'info' });
+    }
+    this.player.speedBonus = this.state.speedLevel * economy.payPads.speedUpgrade.speedBonusPerLevel + (this.rushLeft > 0 ? shopCfg.rushBoost.factor : 0);
     this.city.update(dt);
     this.updateGates(dt);
     this.root.update(dt, this.player.position);
