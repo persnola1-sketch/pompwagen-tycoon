@@ -176,7 +176,7 @@
     "inbound": {
       "spawn": {
         "x": -28,
-        "z": 50
+        "z": 46
       },
       "approach": {
         "x": -28,
@@ -184,13 +184,13 @@
       },
       "exit": {
         "x": -28,
-        "z": -50
+        "z": -46
       }
     },
     "outbound": {
       "spawn": {
         "x": 28,
-        "z": 50
+        "z": 46
       },
       "approach": {
         "x": 28,
@@ -198,7 +198,7 @@
       },
       "exit": {
         "x": 28,
-        "z": -50
+        "z": -46
       }
     },
     "length": 13.2,
@@ -221,5 +221,33 @@
       "x": 12.2,
       "z": 12.0
     }
+  },
+  "city": {
+    "ringZ": 38,
+    "ringX": 46,
+    "outerZ": 80,
+    "outerX": 88,
+    "roadWidth": 9,
+    "laneOffset": 2.3,
+    "sidewalk": 2.4,
+    "bikeLane": 1.5,
+    "roundabout": {
+      "x": 46,
+      "z": -38,
+      "radius": 9
+    },
+    "maxCars": 16,
+    "maxBikes": 6,
+    "maxPedestrians": 12,
+    "carSpeedMin": 6.5,
+    "carSpeedMax": 10.5,
+    "bikeSpeed": 4.2,
+    "walkSpeed": 1.25,
+    "carGap": 7.5,
+    "bikeGap": 3.0,
+    "lightSeconds": 15,
+    "cullDistance": 230,
+    "dayNight": false,
+    "dayLengthSeconds": 600
   }
 }

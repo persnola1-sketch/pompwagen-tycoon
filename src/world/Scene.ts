@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import cam from '../config/camera.json';
+import layout from '../config/layout.json';
 import { CameraRig } from './CameraRig';
 
 const SHADOW_MAP = 1024;
@@ -16,6 +17,11 @@ export class SceneRoot {
   private fpsTime = 0;
   private fpsFrames = 0;
   private warmup = 5;
+  private hemi: THREE.HemisphereLight;
+  private ambient: THREE.AmbientLight;
+  private clock = 0;
+  /** 0 = noon, 0.5 = midnight; only used when the day/night cycle is on */
+  dayNight = layout.city.dayNight;
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -45,8 +51,9 @@ export class SceneRoot {
     this.setShadowExtent(this.shadowExtent);
     this.scene.add(this.sun, this.sun.target);
 
-    this.scene.add(new THREE.HemisphereLight(0xd6e8ff, 0x7a705f, 1.25));
-    this.scene.add(new THREE.AmbientLight(0xffe8c8, 0.35));
+    this.hemi = new THREE.HemisphereLight(0xd6e8ff, 0x7a705f, 1.25);
+    this.ambient = new THREE.AmbientLight(0xffe8c8, 0.35);
+    this.scene.add(this.hemi, this.ambient);
 
     window.addEventListener('resize', () => this.onResize());
     this.onResize();
@@ -93,6 +100,23 @@ export class SceneRoot {
     this.fog.far = cam.fogFar + dist * 1.6;
 
     this.adaptQuality(dt);
+    this.updateDayNight(dt);
+  }
+
+  /** slow sun/sky cycle; the street and dock lamps are unlit materials so they read as lit at night */
+  private updateDayNight(dt: number): void {
+    if (!this.dayNight) return;
+    this.clock = (this.clock + dt / layout.city.dayLengthSeconds) % 1;
+    // a soft cosine day: bright at 0, dark at 0.5
+    const day = (Math.cos(this.clock * Math.PI * 2) + 1) / 2;
+    const dusk = Math.pow(1 - day, 2);
+    this.sun.intensity = 0.25 + day * 2.1;
+    this.sun.color.setRGB(1, 0.94 - dusk * 0.25, 0.86 - dusk * 0.35);
+    this.hemi.intensity = 0.25 + day * 1.0;
+    this.ambient.intensity = 0.12 + day * 0.25;
+    const sky = new THREE.Color().setRGB(0.05 + day * 0.61, 0.07 + day * 0.73, 0.16 + day * 0.76);
+    (this.scene.background as THREE.Color).copy(sky);
+    this.fog.color.copy(sky);
   }
 
   /** lower the pixel ratio step by step if the phone can't hold the target fps */

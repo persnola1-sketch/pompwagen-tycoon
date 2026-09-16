@@ -12,6 +12,8 @@ import { initAssets } from './world/Assets';
 import { SceneRoot } from './world/Scene';
 import { AABB, Warehouse } from './world/Warehouse';
 import { Yard } from './world/Yard';
+import { City } from './world/city/City';
+import names from './config/names.json';
 import { Plot } from './world/Plot';
 import { WarehouseBuild } from './world/construction/WarehouseBuild';
 import { Racks, rowPadZ } from './world/Racks';
@@ -74,6 +76,9 @@ class Game {
   private root: SceneRoot;
   private warehouse: Warehouse;
   private plot: Plot;
+  private yard: Yard;
+  private city: City;
+  private clock = 0;
   private build: WarehouseBuild | null = null;
   private buildHud: HTMLElement | null = null;
   private racks: Racks;
@@ -116,7 +121,10 @@ class Game {
     const scene = this.root.scene;
     this.warehouse = new Warehouse();
     this.plot = new Plot();
-    scene.add(this.warehouse.group, this.plot.group, new Yard().group);
+    this.yard = new Yard();
+    const brandColors = ['#2563b8', '#c2571f', '#2f9e4f', '#8347c2', '#b83a63', '#3aa6a0', '#d6a21e', '#1f8a8a'];
+    this.city = new City(names.stores.map((n, i) => ({ name: n, color: brandColors[i % brandColors.length] })));
+    scene.add(this.warehouse.group, this.plot.group, this.yard.group, this.city.group);
 
     this.racks = new Racks(this.state, this.warehouse.colliders);
     scene.add(this.racks.group);
@@ -629,6 +637,18 @@ class Game {
     }
   }
 
+  /** traffic gives way to the trucks, and the barriers lift as they arrive */
+  private updateGates(dt: number): void {
+    const trucks = [this.supplierTruck, this.customerTruck];
+    const obs = trucks
+      .filter((t) => t.phase !== 'hidden')
+      .map((t) => ({ x: t.group.position.x, z: t.group.position.z, r: 6 }));
+    this.city.setObstacles(obs);
+    const nearGate = trucks.some((t) => t.phase !== 'hidden' && Math.abs(t.group.position.z - layout.yard.fenceZ) < 22);
+    this.yard.setBarriers(nearGate);
+    this.yard.update(dt, this.clock);
+  }
+
   // ---------- main loop ----------
 
   private loop = (now: number): void => {
@@ -709,6 +729,9 @@ class Game {
       this.save.save();
     }
 
+    this.clock += dt;
+    this.city.update(dt);
+    this.updateGates(dt);
     this.root.update(dt, this.player.position);
     this.root.render();
   };
