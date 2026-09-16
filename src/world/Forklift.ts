@@ -164,6 +164,9 @@ export class Forklift {
     const d = this.liftGoal - this.lift;
     const step = this.cfg.liftSpeed * dt;
     this.lift += Math.abs(d) < step ? d : Math.sign(d) * step;
+    // the mast tilts back a little more while the forks are up
+    const tilt = 0.03 + Math.min(0.06, this.lift * 0.02);
+    this.mast.rotation.x += (tilt - this.mast.rotation.x) * Math.min(1, dt * 4);
     this.carriage.position.y = this.lift;
     this.stage2.position.y = Math.max(0, this.lift - 1.6);
     if (this.squash > 0) {

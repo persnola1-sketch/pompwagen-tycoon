@@ -35,6 +35,7 @@ export class Hud {
       `<button id="workers-toggle" aria-label="Workers">👷<span class="badge count" hidden>0</span></button>` +
       `<button id="quests-toggle" aria-label="Quests">🎯<span class="badge" hidden>0</span></button>` +
       `<button id="board-toggle">📋<span class="badge" hidden>0</span></button>` +
+      `<button id="settings-toggle" aria-label="Settings">⚙️</button>` +
       `</div>`;
     document.body.appendChild(hud);
     // the button column lives outside the chip row so both stay clear of the cards
@@ -52,6 +53,7 @@ export class Hud {
     btns.querySelector('#workers-toggle')!.addEventListener('click', () => this.onWorkersToggle?.());
     btns.querySelector('#quests-toggle')!.addEventListener('click', () => this.onQuestsToggle?.());
     btns.querySelector('#board-toggle')!.addEventListener('click', () => this.onBoardToggle?.());
+    btns.querySelector('#settings-toggle')!.addEventListener('click', () => this.onSettings?.());
 
     // left stack: construction timers and the tracked quest, above the joystick
     const stack = document.createElement('div');
@@ -67,8 +69,9 @@ export class Hud {
     stack.appendChild(this.tracked);
     this.overviewBtn.addEventListener('click', () => this.onOverviewToggle?.());
 
-    bus.on('moneyChanged', ({ money }) => {
-      this.moneyEl.textContent = Math.floor(money).toLocaleString('en');
+    bus.on('moneyChanged', ({ money, delta }) => {
+      this.rollTo(money);
+      if (delta > 0) this.coinBurst(Math.min(8, 2 + Math.floor(delta / 120)));
       const chip = document.getElementById('money-chip')!;
       chip.classList.remove('bump');
       void chip.offsetWidth;
@@ -79,6 +82,7 @@ export class Hud {
       this.stockEl.textContent = `${stock}/${capacity}`;
     });
 
+    this.shown = state.money;
     this.moneyEl.textContent = Math.floor(state.money).toLocaleString('en');
     this.setRep(state.reputation);
     this.stockEl.textContent = `${state.stock}/${state.capacity}`;
@@ -124,6 +128,59 @@ export class Hud {
     this.overviewBtn.textContent = on ? '✕' : '🗺️';
     document.body.classList.toggle('overview', on);
   }
+
+  private shown = 0;
+  private target = 0;
+  private raf = 0;
+
+  /** roll the money counter up (or down) instead of snapping */
+  private rollTo(value: number): void {
+    this.target = value;
+    if (this.raf) return;
+    let last = performance.now();
+    const step = (now: number): void => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const diff = this.target - this.shown;
+      this.shown += Math.abs(diff) < 1 ? diff : diff * Math.min(1, dt * 9);
+      this.moneyEl.textContent = Math.floor(this.shown).toLocaleString('en');
+      if (Math.abs(this.target - this.shown) < 0.5) {
+        this.shown = this.target;
+        this.moneyEl.textContent = Math.floor(this.shown).toLocaleString('en');
+        this.raf = 0;
+        return;
+      }
+      this.raf = requestAnimationFrame(step);
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+
+  /** coins flying from the middle of the screen into the money chip */
+  private coinBurst(n: number): void {
+    const chip = document.getElementById('money-chip');
+    if (!chip) return;
+    const to = chip.getBoundingClientRect();
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div');
+      el.className = 'flycoin';
+      const fromX = window.innerWidth / 2 + (Math.random() - 0.5) * 120;
+      const fromY = window.innerHeight * 0.45 + (Math.random() - 0.5) * 80;
+      el.style.left = `${fromX}px`;
+      el.style.top = `${fromY}px`;
+      document.body.appendChild(el);
+      const dx = to.left + to.width / 2 - fromX;
+      const dy = to.top + to.height / 2 - fromY;
+      requestAnimationFrame(() => {
+        el.style.transitionDelay = `${i * 0.045}s`;
+        el.style.transform = `translate(${dx}px, ${dy}px) scale(0.4)`;
+        el.style.opacity = '0.2';
+      });
+      setTimeout(() => el.remove(), 900 + i * 45);
+    }
+  }
+
+  /** the settings button sits with the other HUD buttons */
+  onSettings: (() => void) | null = null;
 
   private setRep(rep: number): void {
     const full = Math.round(rep);

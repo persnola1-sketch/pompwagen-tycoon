@@ -60,6 +60,7 @@ export class Warehouse {
   readonly wallSegments: WallSegment[] = [];
 
   private dockLamps = new Map<TruckKind, { red: THREE.MeshBasicMaterial; green: THREE.MeshBasicMaterial }>();
+  private dockDoors = new Map<TruckKind, { mesh: THREE.Mesh; open: number; want: number }>();
   private wallMats: THREE.MeshStandardMaterial[] = [];
   private hazardMat: THREE.MeshStandardMaterial;
   private wallTex: THREE.Texture;
@@ -214,8 +215,16 @@ export class Warehouse {
         }
         b.box(0.4, 0.6, doorWidth + 0.8, rubber, outer + side * 0.2, doorHeight + 0.3, dz);
         if (active) {
+          // the coil the door rolls into, and the moving door panel itself
           b.add(uvBox(0.6, 0.55, doorWidth - 0.1, 1), doorMat, inner - side * 0.4, doorHeight - 0.32, dz);
           for (const e of [-1, 1]) b.box(2.4, 0.06, 0.06, steel, side * (HALF_W - 1.2), doorHeight - 0.05, dz + e * (doorWidth / 2 - 0.05));
+          const panelGeo = uvBox(0.08, doorHeight - 0.5, doorWidth - 0.12, 1);
+          panelGeo.translate(0, -(doorHeight - 0.5) / 2, 0);
+          const panel = new THREE.Mesh(panelGeo, doorMat);
+          panel.position.set(inner - side * 0.06, doorHeight - 0.55, dz);
+          panel.castShadow = true;
+          this.docks.add(panel);
+          this.dockDoors.set(side < 0 ? 'supplier' : 'customer', { mesh: panel, open: 1, want: 1 });
         } else {
           b.add(unitBox, doorMat, side * (HALF_W + 0.02), doorHeight / 2, dz, 0, 0, 0, 0.08, doorHeight, doorWidth);
         }
@@ -267,6 +276,12 @@ export class Warehouse {
   /** repaint the cladding (shop cosmetics) */
   setWallColor(hex: string): void {
     for (const m of this.wallMats) m.color.set(hex);
+  }
+
+  /** roll a dock door up (open) or down (closed) */
+  setDoorOpen(kind: TruckKind, open: boolean): void {
+    const d = this.dockDoors.get(kind);
+    if (d) d.want = open ? 1 : 0;
   }
 
   setDockLight(kind: TruckKind, docked: boolean): void {
@@ -427,9 +442,16 @@ export class Warehouse {
     this.cutaway.add(box, [steel, housing, lamp], 0.08);
   }
 
-  /** fade walls/roof between the camera and the player */
+  /** fade walls/roof between the camera and the player, and animate the doors */
   update(dt: number, camera: THREE.Camera, target: THREE.Vector3): void {
     if (!this.group.visible) return;
     this.cutaway.update(dt, camera, target);
+    for (const d of this.dockDoors.values()) {
+      if (Math.abs(d.want - d.open) < 0.002) continue;
+      d.open += (d.want - d.open) * Math.min(1, dt * 1.8);
+      // the panel rolls up into the coil: it shrinks from the bottom
+      d.mesh.scale.y = Math.max(0.04, 1 - d.open);
+      d.mesh.visible = d.open < 0.97;
+    }
   }
 }

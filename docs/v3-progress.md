@@ -16,7 +16,7 @@ Tracks what is built per phase of `docs/update-v3.md`, so a new session can cont
 | 10 Clients & brands | done | `config/brands.json` (8 clients, 6 suppliers), `core/Brands.ts` (lookup + loyalty tiers bronze/silver/gold with price bonus), `ui/Logo.ts` (SVG + canvas marks), logos on order cards, order board, truck liveries, city shop fascias, `ui/ClientsPanel.ts` profiles with contact, favourites and history
 | 11 Shop menu | done | `config/shop.json` + `game/Shop.ts` (prices, company-level gates, purchase effects), `ui/ShopPanel.ts` (5 tabs, cards with build/delivery times, lock states), `ui/BottomNav.ts` (Shop · Workers · Quests · Orders · Map with badges, one panel at a time), `ui/MapPanel.ts` live city map, cosmetics (company name/logo, vest, vehicle paint, wall colour) applied to the world
 | 12 Ad hooks | done | `services/AdService.ts` fake rewarded break; 📺 buttons for finish construction/delivery (`TimersHud`), finish training + free temp worker (`WorkersPanel`), double quest reward (`QuestPanel`), double night shift (`ShiftReport`), free rush boost and finish-all (shop Boosts). All optional, never forced
-| 13 Animations & effects | todo | |
+| 13 Animations & effects | done | rolling dock doors, blinking truck indicators, money counter roll-up + coins flying to the HUD, `world/Ambience.ts` (dust motes, birds), idle phone check, forklift mast tilt, button press bounce, procedural background music with a toggle, `ui/SettingsPanel.ts` (sound, music, tips, graphics quality, reset)
 | 14 UI overhaul | todo | |
 | 15 Balance, save, perf | todo | |
 

@@ -39,6 +39,8 @@ import { GuideBubble } from './ui/GuideBubble';
 import { Henk } from './world/Henk';
 import { Toasts } from './ui/Toasts';
 import { Confetti } from './ui/Confetti';
+import { Ambience } from './world/Ambience';
+import { SettingsPanel, SettingsView } from './ui/SettingsPanel';
 import { Interactions } from './game/Interactions';
 import { PayPads } from './game/PayPads';
 import { DevPanel } from './debug/DevPanel';
@@ -99,6 +101,8 @@ class Game {
   private pads = new Pads();
   private player: Player;
   private effects: Effects;
+  private ambience: Ambience;
+  private settingsPanel = new SettingsPanel();
   private supplierTruck: Truck;
   private customerTruck: Truck;
   private interactions: Interactions;
@@ -150,6 +154,7 @@ class Game {
     this.player.speedBonus = this.state.speedLevel * economy.payPads.speedUpgrade.speedBonusPerLevel;
 
     this.effects = new Effects(scene);
+    this.ambience = new Ambience(scene);
     this.henk = new Henk(scene);
     this.fallen = new FallenPallets(scene);
     this.conveyors = new Conveyors(scene, this.state, this.orders, this.bus, this.racks, this.warehouse.colliders);
@@ -308,6 +313,27 @@ class Game {
     this.wireEvents();
     this.wireShop();
     this.wireNav();
+    this.hud.onSettings = (): void => {
+      this.sound.click();
+      this.settingsPanel.open({ ...this.state.settings, quality: this.root.quality }, this.dev.fps);
+    };
+    this.settingsPanel.onChange = (v: SettingsView): void => {
+      this.state.settings.sound = v.sound;
+      this.state.settings.music = v.music;
+      this.state.settings.henkTips = v.henkTips;
+      this.sound.enabled = v.sound;
+      this.sound.musicEnabled = v.music;
+      this.root.setQuality(v.quality);
+      this.ambience.setMotesVisible(v.quality !== 'low');
+      this.save.save();
+    };
+    this.settingsPanel.onReset = (): void => {
+      this.save.reset();
+      window.onbeforeunload = null;
+      location.reload();
+    };
+    this.sound.enabled = this.state.settings.sound;
+    this.sound.musicEnabled = this.state.settings.music;
 
     // fresh game: empty plot; otherwise the warehouse is up and running
     const built = this.state.warehouseBuilt;
@@ -725,6 +751,7 @@ class Game {
         this.sound.airBrake();
         this.orders.truckDocked(kind);
         this.warehouse.setDockLight(kind, true);
+        this.warehouse.setDoorOpen(kind, true);
         this.updateTrucks();
       };
       truck.onGone = (): void => this.orders.truckGone(kind);
@@ -732,6 +759,7 @@ class Game {
 
     this.bus.on('truckArriving', ({ kind }) => {
       this.sound.truckHorn();
+      this.warehouse.setDoorOpen(kind, true);
       if (kind === 'supplier') {
         const o = this.orders.activeSupplier!;
         this.supplierTruck.startArrival(o.supplier, new Array(Math.min(layout.truck.maxVisibleCargo, o.pallets)).fill(o.product));
@@ -741,6 +769,7 @@ class Game {
     });
     this.bus.on('truckLeaving', ({ kind }) => {
       this.warehouse.setDockLight(kind, false);
+      setTimeout(() => this.warehouse.setDoorOpen(kind, false), 2600);
       // short pause so the last pallet action reads clearly
       setTimeout(() => this.truck(kind).startDeparture(), layout.truck.departDelay * 1000);
     });
@@ -873,6 +902,8 @@ class Game {
     this.pads.update(dt, camera, this.root.rig.currentDistance);
     this.warehouse.update(dt, camera, new THREE.Vector3(this.player.x, 0.8, this.player.z));
     this.effects.update(dt);
+    this.ambience.update(dt);
+    this.sound.updateMusic(dt);
     this.popups.update();
     this.interactions.update(dt);
     this.payPads.update(dt);

@@ -448,3 +448,23 @@ body.guiding #left-stack, body.overview #left-stack { opacity: 0; pointer-events
 .qclaim { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
 .qclaim button { min-width: 78px; min-height: 36px; font-size: 12px; }
 .wcard button.ad.small { min-height: 32px; font-size: 11px; padding: 4px 8px; margin-top: 4px; }
+
+/* ---------- juice ---------- */
+button { transition: transform 0.08s ease; }
+button:active:not(:disabled) { transform: scale(0.94); }
+.flycoin {
+  position: fixed; width: 18px; height: 18px; border-radius: 50%; z-index: 85; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, #ffe98a, #f2b418 60%, #c98a10);
+  box-shadow: 0 0 8px rgba(242,192,24,0.6);
+  transition: transform 0.75s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.75s ease;
+}
+.srow { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; font-size: 14px; font-weight: 700; }
+.toggle {
+  width: 52px; height: 30px; border-radius: 15px; background: #3a4457 !important; border: none; padding: 3px; position: relative;
+}
+.toggle i { display: block; width: 24px; height: 24px; border-radius: 50%; background: #aeb5c2; transition: transform 0.18s ease, background 0.18s ease; }
+.toggle.on { background: var(--good) !important; }
+.toggle.on i { transform: translateX(22px); background: #fff; }
+.quality { display: flex; gap: 6px; }
+.quality button { flex: 1; background: #3a4457; min-height: 40px; font-size: 12px; }
+.quality button.on { background: var(--accent); color: #1b2230; }

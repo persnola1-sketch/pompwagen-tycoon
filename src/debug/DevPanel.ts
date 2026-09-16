@@ -11,6 +11,8 @@ export class DevPanel {
   private fpsEl: HTMLElement | null = null;
   private frames = 0;
   private acc = 0;
+  /** last measured fps, shown in the settings panel */
+  fps = 60;
 
   constructor(state: GameState, save: SaveSystem, private renderer: THREE.WebGLRenderer) {
     if (!location.search.includes('dev')) return;
@@ -42,9 +44,18 @@ export class DevPanel {
   }
 
   frame(dt: number): void {
-    if (!this.fpsEl) return;
     this.frames++;
     this.acc += dt;
+    if (this.acc >= 0.5) {
+      this.fps = this.frames / this.acc;
+    }
+    if (!this.fpsEl) {
+      if (this.acc >= 0.5) {
+        this.frames = 0;
+        this.acc = 0;
+      }
+      return;
+    }
     if (this.acc >= 0.5) {
       const info = this.renderer.info.render;
       this.fpsEl.textContent = `${Math.round(this.frames / this.acc)} fps · ${info.calls} calls · ${Math.round(info.triangles / 1000)}k tris · dpr ${this.renderer.getPixelRatio()}`;

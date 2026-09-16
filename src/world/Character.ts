@@ -65,6 +65,8 @@ export class Character {
   private walkT = 0;
   private idleT = Math.random() * 10;
   private celebrateT = 0;
+  private phone: THREE.Mesh | null = null;
+  private phoneT = 0;
   /** arms reach back (pulling a handle) or forward (carrying) */
   armMode: 'pull' | 'carry' | 'idle' | 'drive' = 'pull';
   /** seated pose (driving a forklift) */
@@ -141,6 +143,12 @@ export class Character {
       fore.add(limb(0.05, 0.18), SHIRT, 0, -0.13, 0);
       fore.add(unitSphere, GLOVE, 0, -0.29, 0, 0, 0, 0, 0.11, 0.12, 0.11);
       elbow.add(fore.build());
+      if (sx === 1) {
+        this.phone = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.13, 0.015), mat(0x1c2029, 0.4, 0.3));
+        this.phone.position.set(0, -0.34, 0.02);
+        this.phone.visible = false;
+        elbow.add(this.phone);
+      }
       shoulder.add(upperArm, elbow);
       this.upper.add(shoulder);
       this.shoulders.push(shoulder);
@@ -183,6 +191,11 @@ export class Character {
       leg.knee.rotation.x = Math.max(0, Math.sin(this.walkT * side + 1.2 * side)) * amp * 1.2;
     });
     const idleStretch = moving < 0.05 ? Math.max(0, Math.sin(this.idleT * 0.7)) * 0.25 : 0;
+    // every so often, stand still and check the phone
+    if (moving < 0.05) this.phoneT += dt;
+    else this.phoneT = 0;
+    const onPhone = this.phoneT > 6 && (this.phoneT % 14) < 6;
+    if (this.phone) this.phone.visible = onPhone;
     this.shoulders.forEach((sh, i) => {
       const side = i === 0 ? 1 : -1;
       if (this.armMode === 'pull') {
@@ -191,6 +204,9 @@ export class Character {
       } else if (this.armMode === 'carry') {
         sh.rotation.x = -1.1;
         this.elbows[i].rotation.x = -0.9;
+      } else if (onPhone && i === 1) {
+        sh.rotation.x = -0.75;
+        this.elbows[i].rotation.x = -1.5;
       } else {
         sh.rotation.x = -s * 0.5 * moving * side - idleStretch * 2.6;
         this.elbows[i].rotation.x = -0.3 - moving * 0.6;

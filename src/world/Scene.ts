@@ -22,6 +22,8 @@ export class SceneRoot {
   private clock = 0;
   /** 0 = noon, 0.5 = midnight; only used when the day/night cycle is on */
   dayNight = layout.city.dayNight;
+  /** 'auto' lets the fps sampler pick the pixel ratio */
+  quality: 'auto' | 'low' | 'medium' | 'high' = 'auto';
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -57,6 +59,17 @@ export class SceneRoot {
 
     window.addEventListener('resize', () => this.onResize());
     this.onResize();
+  }
+
+  /** graphics quality: pixel ratio and shadows */
+  setQuality(q: 'auto' | 'low' | 'medium' | 'high'): void {
+    this.quality = q;
+    if (q === 'auto') return;
+    const ratios = { low: 1, medium: 1.5, high: Math.min(window.devicePixelRatio, 2) };
+    this.pixelRatio = ratios[q];
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.renderer.shadowMap.enabled = q !== 'low';
+    this.sun.castShadow = q !== 'low';
   }
 
   /** the LED lighting upgrade brightens the hall */
@@ -127,6 +140,7 @@ export class SceneRoot {
 
   /** lower the pixel ratio step by step if the phone can't hold the target fps */
   private adaptQuality(dt: number): void {
+    if (this.quality !== 'auto') return;
     const q = cam.adaptiveQuality;
     if (this.warmup > 0) {
       this.warmup -= dt;

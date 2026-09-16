@@ -89,6 +89,8 @@ export class Truck {
   private vehicleMount = new THREE.Group();
   private ramp: THREE.Mesh;
   private rollT = -1;
+  private indicators: THREE.Mesh[] = [];
+  private blinkT = 0;
   private rollDur = 2.6;
   private onRolled: (() => void) | null = null;
 
@@ -103,6 +105,18 @@ export class Truck {
     this.ramp.rotation.x = Math.atan2(FLOOR_Y, 2.2);
     this.ramp.visible = false;
     this.group.add(this.ramp);
+    // amber indicators on the trailer corners, blinking while manoeuvring
+    const indGeo = new THREE.BoxGeometry(0.12, 0.12, 0.05);
+    const indMat = new THREE.MeshBasicMaterial({ color: 0xffa21a });
+    for (const sx of [-1, 1]) {
+      for (const z of [0.1, TRAILER_LEN - 0.1]) {
+        const m = new THREE.Mesh(indGeo, indMat);
+        m.position.set(sx * 1.2, 0.78, z);
+        m.visible = false;
+        this.group.add(m);
+        this.indicators.push(m);
+      }
+    }
     this.buildTrailer();
     this.buildTractor();
     this.tractor.position.z = KINGPIN_Z;
@@ -379,6 +393,12 @@ export class Truck {
       this.group.getWorldQuaternion(parentQ);
       this.label.quaternion.copy(parentQ.invert().multiply(camera.quaternion));
     }
+
+    // indicators blink while arriving or leaving, steady off when parked
+    const manoeuvring = this.phase === 'arriving' || this.phase === 'leaving';
+    this.blinkT += dt;
+    const on = manoeuvring && Math.sin(this.blinkT * 7) > 0;
+    for (const m of this.indicators) m.visible = on;
 
     if (this.rollT >= 0) {
       this.rollT += dt / this.rollDur;

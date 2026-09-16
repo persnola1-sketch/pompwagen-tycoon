@@ -110,6 +110,68 @@ export class Sound {
     this.tone(523, 0.14, 'sine', 0.15, undefined, 0.2);
     this.tone(659, 0.25, 'sine', 0.16, undefined, 0.3);
   }
+  private musicGain: GainNode | null = null;
+  private musicTimer = 0;
+  private musicStep = 0;
+  musicEnabled = true;
+
+  /**
+   * A slow, warm four-chord pad that loops under the game. It is scheduled a
+   * bar at a time from the main loop so it costs nothing when muted.
+   */
+  updateMusic(dt: number): void {
+    if (!this.musicEnabled || !this.enabled) {
+      if (this.musicGain) this.musicGain.gain.setTargetAtTime(0, this.ctx?.currentTime ?? 0, 0.4);
+      return;
+    }
+    this.ensure();
+    if (!this.ctx || !this.master || this.ctx.state !== 'running') return;
+    if (!this.musicGain) {
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = 0;
+      this.musicGain.connect(this.master);
+    }
+    this.musicGain.gain.setTargetAtTime(0.16, this.ctx.currentTime, 1.5);
+    this.musicTimer -= dt;
+    if (this.musicTimer > 0) return;
+    const bar = 4.8;
+    this.musicTimer = bar;
+    // I – vi – IV – V in C, one soft pad chord per bar plus a bass note
+    const chords = [
+      [261.63, 329.63, 392.0],
+      [220.0, 261.63, 329.63],
+      [174.61, 220.0, 261.63],
+      [196.0, 246.94, 293.66],
+    ];
+    const chord = chords[this.musicStep % chords.length];
+    this.musicStep++;
+    const t0 = this.ctx.currentTime;
+    for (const f of chord) this.pad(f, t0, bar, 0.16);
+    this.pad(chord[0] / 2, t0, bar * 0.5, 0.2, 'triangle');
+    // a light two-note motif every other bar
+    if (this.musicStep % 2 === 0) {
+      this.pad(chord[2] * 2, t0 + bar * 0.5, 0.9, 0.09, 'sine');
+      this.pad(chord[1] * 2, t0 + bar * 0.75, 0.9, 0.07, 'sine');
+    }
+  }
+
+  private pad(freq: number, when: number, dur: number, vol: number, type: OscillatorType = 'sine'): void {
+    if (!this.ctx || !this.musicGain) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1400;
+    osc.type = type;
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    osc.connect(filter).connect(g).connect(this.musicGain);
+    osc.start(when);
+    osc.stop(when + dur + 0.05);
+  }
+
   private humOsc: OscillatorNode | null = null;
   private humGain: GainNode | null = null;
 
