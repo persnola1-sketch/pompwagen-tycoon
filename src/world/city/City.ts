@@ -154,6 +154,13 @@ export class City {
     this.group.add(b.build());
   }
 
+  /** scale the moving population to the graphics quality */
+  setQuality(q: 'auto' | 'low' | 'medium' | 'high'): void {
+    const f = q === 'low' ? 0.35 : q === 'medium' ? 0.7 : 1;
+    this.traffic.setLimit(f);
+    this.pedestrians.setLimit(f);
+  }
+
   /** the warehouse trucks, so traffic gives way to them */
   setObstacles(obs: Obstacle[]): void {
     this.traffic.obstacles = obs;

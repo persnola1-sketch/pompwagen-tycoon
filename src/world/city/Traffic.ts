@@ -98,6 +98,8 @@ export class Traffic {
   /** trucks and other game objects the traffic must not hit */
   obstacles: Obstacle[] = [];
   private scale = new THREE.Vector3(1, 1, 1);
+  /** how many movers are actually simulated (lowered on weak devices) */
+  private limit = Infinity;
 
   constructor(parent: THREE.Object3D, junctions: { x: number; z: number }[]) {
     this.junctions = junctions;
@@ -200,6 +202,11 @@ export class Traffic {
     return false;
   }
 
+  /** fewer cars and bikes on low graphics settings */
+  setLimit(fraction: number): void {
+    this.limit = Math.max(2, Math.round(this.movers.length * fraction));
+  }
+
   update(dt: number): void {
     this.lightTimer += dt;
     if (this.lightTimer >= C.lightSeconds) {
@@ -211,7 +218,9 @@ export class Traffic {
     let wheelN = 0;
     let bikeN = 0;
     let bikeWheelN = 0;
-    for (const m of this.movers) {
+    const active = Math.min(this.movers.length, this.limit);
+    for (let mi = 0; mi < active; mi++) {
+      const m = this.movers[mi];
       const gap = m.kind === 2 ? C.bikeGap : C.carGap;
       const stop = this.blocked(m, gap) || this.redAhead(m);
       const target = stop ? 0 : m.maxSpeed;

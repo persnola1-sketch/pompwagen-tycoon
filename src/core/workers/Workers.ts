@@ -54,6 +54,12 @@ export class Workers {
     return hireCostFor(this.count, 'steady');
   }
 
+  /** how many staff the company may employ at its current level */
+  get maxStaff(): number {
+    const caps = cfg.maxWorkersPerLevel;
+    return caps[Math.min(this.state.companyLevel, caps.length) - 1] ?? cfg.maxWorkers;
+  }
+
   byId(id: number): Worker | undefined {
     return this.workers.find((w) => w.id === id);
   }
@@ -133,8 +139,11 @@ export class Workers {
   hire(index: number): Worker | null {
     const c = this.candidates[index];
     if (!c) return null;
-    if (this.count >= cfg.maxWorkers) {
-      this.bus.emit('toast', { text: 'Your team is full!', kind: 'bad' });
+    if (this.count >= this.maxStaff) {
+      this.bus.emit('toast', {
+        text: this.count >= cfg.maxWorkers ? 'Your team is full!' : `Reach company level ${this.state.companyLevel + 1} to hire more`,
+        kind: 'bad',
+      });
       return null;
     }
     if (this.state.money < c.hireCost) {

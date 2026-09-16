@@ -7,7 +7,7 @@
     { "id": "cosmetics", "name": "Style", "emoji": "🎨" }
   ],
   "items": [
-    { "id": "electric", "tab": "equipment", "name": "Electric pompwagen", "desc": "Carries 2 pallets and moves faster", "icon": "🔋", "kind": "vehicle", "dynamic": "electric", "level": 2 },
+    { "id": "electric", "tab": "equipment", "name": "Electric pompwagen", "desc": "Carries 2 pallets and moves faster", "icon": "🔋", "kind": "vehicle", "dynamic": "electric", "level": 3 },
     { "id": "forklift", "tab": "equipment", "name": "Forklift", "desc": "Fast, and the only way to reach the upper racks", "icon": "🚜", "kind": "vehicle", "dynamic": "forklift", "level": 5 },
     { "id": "speed", "tab": "equipment", "name": "Faster wheels", "desc": "+12% speed for your pompwagen, every level", "icon": "⚡", "kind": "speed", "dynamic": "speed", "level": 1 },
     { "id": "beltSpeed", "tab": "equipment", "name": "Belt motor upgrade", "desc": "Conveyors run faster", "icon": "⚙️", "kind": "conveyorSpeed", "dynamic": "beltSpeed", "level": 6 },

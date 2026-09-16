@@ -143,13 +143,13 @@ export class WorkersPanel {
       </div>`;
     });
     const tempUnlocked = w.count >= cfg.temp.unlockWorkers;
-    const full = w.count >= cfg.maxWorkers;
+    const full = w.count >= w.maxStaff;
     return `
       <div class="row-between">
-        <div><b>Candidates</b> <span class="muted">${w.count}/${cfg.maxWorkers} hired</span></div>
+        <div><b>Candidates</b> <span class="muted">${w.count}/${w.maxStaff} hired</span></div>
         <button data-a="refresh" data-cost="${cfg.refreshFee}" class="small">🔄 Refresh ${eur(cfg.refreshFee)} <span class="muted refresh-timer">${this.refreshLabel()}</span></button>
       </div>
-      ${full ? '<div class="note">Your team is full.</div>' : cards.join('')}
+      ${full ? `<div class="note">${w.count >= cfg.maxWorkers ? 'Your team is full.' : `Reach company level ${this.state.companyLevel + 1} to hire your next worker.`}</div>` : cards.join('')}
       <div class="temp-row ${tempUnlocked ? '' : 'locked'}">
         <div><b>⏱ Temp worker</b><br><span class="muted">${tempUnlocked ? `Extra hands for ${cfg.temp.seconds / 60} minutes during a rush` : `Unlocks with ${cfg.temp.unlockWorkers} workers`}</span></div>
         <div class="btns-col">

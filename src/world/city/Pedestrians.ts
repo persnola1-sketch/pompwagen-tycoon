@@ -57,8 +57,18 @@ export class Pedestrians {
     }
   }
 
+  /** fewer people on low graphics settings */
+  setLimit(fraction: number): void {
+    const n = Math.max(2, Math.round(this.walkers.length * fraction));
+    this.body.count = n;
+    this.head.count = n;
+    this.limit = n;
+  }
+
+  private limit = Infinity;
+
   update(dt: number): void {
-    this.walkers.forEach((w, i) => {
+    this.walkers.slice(0, this.limit).forEach((w, i) => {
       w.dist += w.speed * dt;
       w.bob += dt * w.speed * 5;
       const p = w.loop.poseAt(w.dist);

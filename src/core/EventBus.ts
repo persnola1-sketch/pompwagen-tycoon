@@ -20,7 +20,7 @@ export type GameEvents = {
   palletStored: { slot: number; product: string };
   palletLoaded: { remaining: number; product: string };
   deliveryComplete: { orderId: number };
-  orderShipped: { orderId: number; store: string; revenue: number; profit: number; fast: boolean };
+  orderShipped: { orderId: number; store: string; pallets: number; revenue: number; profit: number; fast: boolean };
   orderMissed: { orderId: number };
   productUnlocked: { product: string };
 

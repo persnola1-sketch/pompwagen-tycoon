@@ -1,10 +1,14 @@
 {
-  "hireCosts": [100, 250, 800],
+  "hireCosts": [
+    100,
+    250,
+    800
+  ],
   "hireCostGrowth": 1.8,
   "maxWorkers": 12,
-  "wageFractionOfHire": 0.04,
-  "wageMin": 5,
-  "shiftMinutes": 10,
+  "wageFractionOfHire": 0.08,
+  "wageMin": 12,
+  "shiftMinutes": 5,
   "candidates": 3,
   "refreshSeconds": 180,
   "refreshFee": 50,
@@ -25,38 +29,233 @@
     "coffeeMachineFactor": 0.6,
     "canteenFactor": 0.4
   },
-  "training": { "forkliftSeconds": 120 },
-  "temp": { "fee": 150, "seconds": 300, "unlockWorkers": 2 },
-  "offline": { "capHours": 8, "palletsPerMinutePerWorker": 0.6, "profitFraction": 0.5, "minMinutes": 2 },
-  "clerk": { "decisionDelay": 2.5 },
+  "training": {
+    "forkliftSeconds": 120
+  },
+  "temp": {
+    "fee": 150,
+    "seconds": 300,
+    "unlockWorkers": 2
+  },
+  "offline": {
+    "capHours": 8,
+    "palletsPerMinutePerWorker": 0.6,
+    "profitFraction": 0.5,
+    "minMinutes": 2
+  },
+  "clerk": {
+    "decisionDelay": 2.5
+  },
   "roles": [
-    { "id": "unloader", "name": "Unloader", "emoji": "📥", "desc": "Supplier truck → racks", "unlockWorkers": 0 },
-    { "id": "loader", "name": "Loader", "emoji": "📤", "desc": "Racks → customer trucks", "unlockWorkers": 1 },
-    { "id": "clerk", "name": "Office clerk", "emoji": "🖥️", "desc": "Auto-accepts offers by your rules", "unlockWorkers": 2 },
-    { "id": "forklift", "name": "Forklift driver", "emoji": "🚜", "desc": "Needs a forklift + certification", "unlockWorkers": 3 },
-    { "id": "teamlead", "name": "Team leader", "emoji": "📣", "desc": "Nearby workers work faster", "unlockWorkers": 5 }
+    {
+      "id": "unloader",
+      "name": "Unloader",
+      "emoji": "\ud83d\udce5",
+      "desc": "Supplier truck \u2192 racks",
+      "unlockWorkers": 0
+    },
+    {
+      "id": "loader",
+      "name": "Loader",
+      "emoji": "\ud83d\udce4",
+      "desc": "Racks \u2192 customer trucks",
+      "unlockWorkers": 1
+    },
+    {
+      "id": "clerk",
+      "name": "Office clerk",
+      "emoji": "\ud83d\udda5\ufe0f",
+      "desc": "Auto-accepts offers by your rules",
+      "unlockWorkers": 2
+    },
+    {
+      "id": "forklift",
+      "name": "Forklift driver",
+      "emoji": "\ud83d\ude9c",
+      "desc": "Needs a forklift + certification",
+      "unlockWorkers": 3
+    },
+    {
+      "id": "teamlead",
+      "name": "Team leader",
+      "emoji": "\ud83d\udce3",
+      "desc": "Nearby workers work faster",
+      "unlockWorkers": 5
+    }
   ],
   "traits": [
-    { "id": "clumsy", "name": "Fast but clumsy", "emoji": "💨", "desc": "+15% speed, sometimes drops a pallet", "speed": 1.15, "drop": 0.05 },
-    { "id": "coffee", "name": "Coffee lover", "emoji": "☕", "desc": "Longer breaks, better mood (+XP)", "breakLen": 1.5, "xp": 1.2 },
-    { "id": "nightowl", "name": "Night owl", "emoji": "🦉", "desc": "+25% speed on the night shift", "night": 1.25 },
-    { "id": "exforklift", "name": "Ex-forklift driver", "emoji": "🎓", "desc": "Half training time", "training": 0.5 },
-    { "id": "rookie", "name": "Rookie", "emoji": "🌱", "desc": "Slow and cheap, levels fast", "speed": 0.85, "cost": 0.7, "xp": 1.6 },
-    { "id": "steady", "name": "Steady hands", "emoji": "🧤", "desc": "Never drops anything, short breaks", "breakLen": 0.7 },
-    { "id": "sprinter", "name": "Sprinter", "emoji": "🏃", "desc": "+10% speed when empty", "speedEmpty": 1.1 },
-    { "id": "chatty", "name": "Chatty", "emoji": "💬", "desc": "Boosts nearby colleagues a little", "aura": 0.05 },
-    { "id": "veteran", "name": "Veteran", "emoji": "🏅", "desc": "Starts at level 3, costs more", "startLevel": 3, "cost": 1.4 }
+    {
+      "id": "clumsy",
+      "name": "Fast but clumsy",
+      "emoji": "\ud83d\udca8",
+      "desc": "+15% speed, sometimes drops a pallet",
+      "speed": 1.15,
+      "drop": 0.05
+    },
+    {
+      "id": "coffee",
+      "name": "Coffee lover",
+      "emoji": "\u2615",
+      "desc": "Longer breaks, better mood (+XP)",
+      "breakLen": 1.5,
+      "xp": 1.2
+    },
+    {
+      "id": "nightowl",
+      "name": "Night owl",
+      "emoji": "\ud83e\udd89",
+      "desc": "+25% speed on the night shift",
+      "night": 1.25
+    },
+    {
+      "id": "exforklift",
+      "name": "Ex-forklift driver",
+      "emoji": "\ud83c\udf93",
+      "desc": "Half training time",
+      "training": 0.5
+    },
+    {
+      "id": "rookie",
+      "name": "Rookie",
+      "emoji": "\ud83c\udf31",
+      "desc": "Slow and cheap, levels fast",
+      "speed": 0.85,
+      "cost": 0.7,
+      "xp": 1.6
+    },
+    {
+      "id": "steady",
+      "name": "Steady hands",
+      "emoji": "\ud83e\udde4",
+      "desc": "Never drops anything, short breaks",
+      "breakLen": 0.7
+    },
+    {
+      "id": "sprinter",
+      "name": "Sprinter",
+      "emoji": "\ud83c\udfc3",
+      "desc": "+10% speed when empty",
+      "speedEmpty": 1.1
+    },
+    {
+      "id": "chatty",
+      "name": "Chatty",
+      "emoji": "\ud83d\udcac",
+      "desc": "Boosts nearby colleagues a little",
+      "aura": 0.05
+    },
+    {
+      "id": "veteran",
+      "name": "Veteran",
+      "emoji": "\ud83c\udfc5",
+      "desc": "Starts at level 3, costs more",
+      "startLevel": 3,
+      "cost": 1.4
+    }
   ],
   "names": {
-    "first": ["Daan", "Sem", "Bram", "Lars", "Jesse", "Finn", "Sanne", "Fleur", "Lotte", "Noor", "Emma", "Julia", "Pieter", "Henk", "Kees", "Gerrit", "Wim",
-      "Jānis", "Kristaps", "Mārtiņš", "Edgars", "Raimonds", "Andris", "Līga", "Ilze", "Anna", "Elīna", "Laura", "Zane", "Kaspars", "Uldis", "Dace"],
-    "last": ["de Vries", "Jansen", "Bakker", "Visser", "Smit", "Mulder", "de Boer", "Dijkstra", "Vos", "Kuiper",
-      "Bērziņš", "Kalniņš", "Ozoliņš", "Liepiņš", "Krūmiņš", "Jansons", "Zariņš", "Eglītis", "Balodis", "Vītols"]
+    "first": [
+      "Daan",
+      "Sem",
+      "Bram",
+      "Lars",
+      "Jesse",
+      "Finn",
+      "Sanne",
+      "Fleur",
+      "Lotte",
+      "Noor",
+      "Emma",
+      "Julia",
+      "Pieter",
+      "Henk",
+      "Kees",
+      "Gerrit",
+      "Wim",
+      "J\u0101nis",
+      "Kristaps",
+      "M\u0101rti\u0146\u0161",
+      "Edgars",
+      "Raimonds",
+      "Andris",
+      "L\u012bga",
+      "Ilze",
+      "Anna",
+      "El\u012bna",
+      "Laura",
+      "Zane",
+      "Kaspars",
+      "Uldis",
+      "Dace"
+    ],
+    "last": [
+      "de Vries",
+      "Jansen",
+      "Bakker",
+      "Visser",
+      "Smit",
+      "Mulder",
+      "de Boer",
+      "Dijkstra",
+      "Vos",
+      "Kuiper",
+      "B\u0113rzi\u0146\u0161",
+      "Kalni\u0146\u0161",
+      "Ozoli\u0146\u0161",
+      "Liepi\u0146\u0161",
+      "Kr\u016bmi\u0146\u0161",
+      "Jansons",
+      "Zari\u0146\u0161",
+      "Egl\u012btis",
+      "Balodis",
+      "V\u012btols"
+    ]
   },
   "looks": {
-    "skins": [15772805, 13208155, 9263675, 15780264, 11829367, 7433246],
-    "hairs": [4862748, 2236962, 11184810, 15774015, 9127187, 5395026],
-    "shirts": [2899558, 5926794, 7027002, 2650444, 6842967, 4013873],
-    "vests": [16743962, 16756768, 16776960, 5104862, 16748109]
-  }
+    "skins": [
+      15772805,
+      13208155,
+      9263675,
+      15780264,
+      11829367,
+      7433246
+    ],
+    "hairs": [
+      4862748,
+      2236962,
+      11184810,
+      15774015,
+      9127187,
+      5395026
+    ],
+    "shirts": [
+      2899558,
+      5926794,
+      7027002,
+      2650444,
+      6842967,
+      4013873
+    ],
+    "vests": [
+      16743962,
+      16756768,
+      16776960,
+      5104862,
+      16748109
+    ]
+  },
+  "maxWorkersPerLevel": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ]
 }

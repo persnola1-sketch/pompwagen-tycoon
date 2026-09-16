@@ -1,154 +1,168 @@
-# Warehouse Tycoon – Game Design v2
+# Pompwagen Tycoon – Game Design v3
 
-> Put this file in the project as `docs/game-design.md`. Every prompt to the AI should point to it.
+> The living design doc. `docs/economy.md` holds the numbers, `docs/mvp-plan.md`
+> the original plan, `docs/update-v3.md` the brief this version was built from,
+> and `docs/v3-progress.md` what shipped in each phase.
 
 ## 1. The pitch
 
-You run a warehouse that works as a **middleman**. Supplier trucks bring pallets of products. You unload and store them. Stores send their trucks to buy stock. You load their trucks and earn the difference between what you paid and what they pay. Leftover stock stays in your racks for the next customer. Grow from one pompwagen and a few racks to a big distribution center.
+You run a warehouse that works as a **middleman**. Supplier trucks bring pallets
+of products. You unload and store them. Shops send their trucks to buy stock.
+You load their trucks and earn the difference. Leftover stock waits in your racks
+for the next customer.
 
-## 2. Core loop (example with water bottles)
+You start on an **empty plot in a Dutch city** with €20,000 and a retired
+warehouse legend called Henk. You buy the warehouse, build the loop by hand,
+then hire a team, automate with conveyors and a forklift, and grow into a
+distribution centre while the city drives past outside.
 
-1. **Supplier offer pops up:** "AquaPure wants to deliver 10 pallets of water bottles for €8 per pallet. Free rack space: 14." → Accept / Decline.
-2. Accepting costs money (€80). The supplier truck drives in and backs up to an **inbound dock door**.
-3. Player drives the pompwagen to the truck and unloads pallets one by one onto the **Unload pad**, then stores them in rack slots. Racks visibly fill up.
-4. **Customer order pops up:** "FreshMart needs 6 pallets of water bottles, pays €14 per pallet. In stock: 10 ✔" → Accept / Decline.
-5. The customer truck arrives at an **outbound dock door** on the other side of the warehouse.
-6. Player takes pallets from the racks and loads the customer truck. Truck leaves → money + profit popup ("+€84, profit €36").
-7. The remaining 4 pallets stay in stock for the next order.
-8. Spend profit on **upgrade pads**: more racks, second dock door, faster pompwagen, electric pompwagen, workers.
+## 2. Core loop
 
-**What makes it a game:** decisions. Do I buy more stock now or wait? Do I have space? Can I fill this order in time? Is this customer worth it?
+1. **Supplier offer**: "Vitalis Water — 6 pallets of water at €33. Free rack space: 14." Accept or decline.
+2. The supplier truck drives through the city, in through the gate barrier, and reverses onto the **inbound dock**.
+3. Pallets come off the truck at the **UNLOAD pad** and go into rack slots — by you, by your unloaders, or onto the inbound conveyor.
+4. **Customer order**: "FreshMart needs 6 pallets of water, pays €74. In stock: 10 ✔"
+5. Their truck docks on the outbound side; pallets go from the racks to the **LOAD pad** (or onto the outbound belt, which loads the truck itself).
+6. Truck leaves → money, profit popup, company XP, client loyalty.
+7. Profit buys upgrades: rack rows, workers, an electric pompwagen, conveyors, a forklift, upper rack levels.
 
-## 3. Scaling the grind
+**What makes it a game:** decisions. Buy stock now or save for a worker? Is
+there space? Can I fill this order before the deadline? Is this client worth it?
 
-The manual pompwagen carries 1 pallet, so unloading 50 pallets is 50 trips. Early orders stay small and grow with your equipment:
+## 3. Progression
 
-| Stage | Equipment | Typical supplier delivery | Typical customer order |
+| Stage | What you have | Typical delivery | Typical order |
 |---|---|---|---|
-| Start | Pompwagen | 4–8 pallets | 2–5 pallets |
-| Upgrade 1 | Electric pompwagen | 8–15 | 5–10 |
-| Upgrade 2 | Forklift (upper rack levels) | 15–30 | 10–20 |
-| Later | Workers + reach truck | 30–60 | 20–40 |
+| Plot | nothing but €20,000 | – | – |
+| Start | pompwagen, 2 rack rows | 3–6 pallets | 2–4 |
+| Team | 2–4 workers | 3–6 | 2–4 |
+| Electric | electric pompwagen (2 pallets) | 6–12 | 4–8 |
+| Automated | conveyors, forklift, 3 rack levels | 12–24 | 8–16 |
 
-## 4. Order system (popups)
+Everything meaningful is gated by **company level** as well as money, so the
+€20,000 start cannot skip the game (`docs/economy.md`).
 
-**Supplier offer card**
-- Supplier name + logo (fictional companies only)
-- Product and pallet count
-- Price per pallet and total cost
-- Your free rack space for that product (red if not enough)
-- Accept / Decline, offer expires after a timer
+## 4. Henk and the tutorial
 
-**Customer order card**
-- Store name (fictional)
-- Product and pallet count requested
-- Price per pallet, total, and profit estimate
-- **Stock check:** "In stock: 30 / needed: 20 ✔" or "In stock: 12 / needed: 20 ✖"
-- Accept / Decline, deadline timer after accepting
-- Reputation bonus for fast delivery, penalty for missing a deadline
+Henk is a friendly blue hologram with an orange vest, a mustache and a
+clipboard. He floats near the player, turns to face them and points a beam at
+the current target. His speech bubbles type themselves out with voice blips and
+a skip button.
 
-**Order board:** small list on screen with active deliveries and orders (product, pallets done / total, time left).
+1. Welcome to the plot
+2. Stand on **BUY WAREHOUSE – €15,000** → the 10-second construction sequence
+3. Accept the first supplier delivery
+4. Unload it on the UNLOAD pad
+5. Store the pallets in the racks
+6. Accept the first customer order
+7. Load their truck → first profit
+8. Hire the first worker (€100) → the tutorial ends
 
-## 5. Products
+Afterwards Henk pops up once per new feature (first worker, first construction,
+first forklift, first conveyor, first event) with a one-line tip. Tips can be
+switched off in Settings.
 
-- **Now:** 6 products in `src/config/products.json`, each with its own pallet look (wrap colour, box style), buy price, sell price and demand
-- You start with water bottles and soft drinks. Chips, toilet paper, canned food and cleaning products unlock as you ship more pallets.
-- Customers order one product or a mixed load of two
-- Every pallet takes its own rack slot, and slot tags on the beams show which product sits where, so space is a real decision
-- Pricing and pacing math: `docs/economy.md`
+## 5. Orders and clients
 
-Use fictional supplier and store names, not real brands.
+- Supplier and customer offers arrive as **cards**: brand logo, contact
+  portrait, product lines with pallet counts and prices, stock checks with ✔/✖,
+  the profit estimate and a countdown ring.
+- **8 fictional clients and 6 suppliers** (`src/config/brands.json`) with
+  code-generated SVG logos, brand colours, and contact people. Their livery is
+  on the trucks, their sign is on their shop in the city.
+- **Loyalty**: every on-time order raises a client's loyalty, a missed deadline
+  lowers it. Bronze → Silver (+4% price) → Gold (+8%). Their card shows the
+  history that earned it.
+- Missing a deadline also costs reputation, which feeds the price bonus.
 
-## 6. Storage
+## 6. Products and storage
 
-- Real pallet racking: orange beams, blue/grey uprights, visible slots
-- Each rack section has slots on the floor level (upper levels unlock with the forklift)
-- Pallets are placed into specific slots and stay visible
-- Label on each rack: product name and "12 / 20"
-- **Storage expansion** = unlock new rack rows via upgrade pads
+- Six products in `src/config/products.json`, each with its own pallet look,
+  price band and demand. They unlock by pallets shipped, or instantly with a
+  licence bought in the shop.
+- Racks are real pallet racking: blue uprights, orange beams, visible slots,
+  a product tag per slot and a row label with the fill count.
+- **Three levels per rack row.** The floor level is for pompwagens; levels 2 and
+  3 are unlocked per row and only reachable by forklift.
 
-## 7. Floor pads (replaces the rings)
+## 7. Floor pads
 
-Call them **floor pads** (in the genre they're often called action or unlock pads). They're built into the floor like inset steel plates:
-- Slightly raised metal plate with yellow-black hazard striped border
-- Icon and text painted on the plate, readable from the camera
-- Subtle glow or light strip when active, not a floating ring
+Inset steel plates with hazard borders, big painted text and a floating label
+with an icon and the price that always faces the camera.
 
-**Pad types**
-| Pad | Text on pad | What it does |
-|---|---|---|
-| Unload pad | "UNLOAD" + truck icon | Standing here takes a pallet off the docked supplier truck |
-| Load pad | "LOAD" + truck icon | Standing here puts a carried pallet into the customer truck |
-| Rack pad | Product name + "12 / 20" | Standing here stores or takes a pallet |
-| Unlock pad | "NEW RACK ROW – €500" | Stand on it and money flows in until paid, then the rack builds with an animation |
-| Upgrade pad | "ELECTRIC POMPWAGEN – €1,500" | Same pay-by-standing, unlocks the upgrade |
-| Office pad | "OFFICE" | Opens the order board and upgrade menu |
+| Pad | What it does |
+|---|---|
+| BUY WAREHOUSE | pay-by-standing, starts the construction sequence |
+| UNLOAD / LOAD | takes a pallet off the supplier truck / puts one in the customer truck |
+| Rack strips | store or take pallets (the forklift also reaches the upper levels) |
+| NEW RACK ROW | pay-by-standing, then a construction site builds the row |
+| FASTER WHEELS | instant speed upgrade, three levels |
+| ELECTRIC / FORKLIFT | orders the vehicle; a delivery truck brings it |
+| RACK LEVEL | unlocks the next level of a rack row |
+| INBOUND / OUTBOUND BELT | builds a conveyor |
+| PARKING | swap between pompwagen and forklift |
+| OFFICE | opens the order board |
 
-Pay-by-standing: coins fly from the player into the pad, a fill bar shows progress, stepping off pauses it.
+Pay-by-standing: coins fly from the player into the pad, a ring fills around it,
+stepping off pauses it.
 
-## 8. Pompwagen movement
+## 8. Workers
 
-- Character walks forward holding the handle behind them
-- Rigid handle with fixed length, pivots at the steering wheels
-- Trailer physics: the body rotates around the fork rollers and swings wide in turns, never stretches, detaches, or spins on the spot
-- Steering wheels turn toward the handle, all wheels spin
-- Limited turn speed, short acceleration and braking
-- Heavier (slower acceleration, wider turns) when loaded
-- Pompwagen body collides with walls, racks, and trucks
-- Fallback if it's frustrating on phones: push mode with forks in front
+Workers are the first real upgrade, hired during the tutorial.
 
-## 9. Visual direction: "realistic-leaning"
+- **Costs**: €100, €250, €800, then ×1.8. Wages are 8% of the hire cost (min €12) per 5-minute shift.
+- **Roles**: unloader, loader, office clerk (auto-accepts by your rules), forklift driver (needs certification), team leader (speeds up nearby workers).
+- **Candidate cards**: name (Dutch and Latvian), portrait, role, trait, star rating, cost. Three at a time, free refresh every 3 minutes or €50.
+- **Traits**: fast but clumsy, coffee lover, night owl, ex-forklift driver, rookie, steady hands, sprinter, chatty, veteran.
+- **Levels**: XP per pallet moved; higher levels are faster and from level 5 drive electric pompwagens.
+- **Status bubbles**: 📦 carrying, ☕ break, ❗ waiting, 💤 idle, 🎓 training.
+- **Pathfinding**: A* around racks, props, conveyors and each other.
+- **The player** is a supervisor: nearby workers go faster, and only the boss can pick up a pallet a clumsy worker dropped.
+- **Shifts**: day or night. Night workers keep earning offline (8 h cap) and the Shift Report shows what they did.
+- **Roster cap**: one worker per company level.
 
-Photorealistic graphics aren't realistic for phones in a browser, or for a two-person team. The target is a **clean, realistic-leaning look** like a polished mobile tycoon game:
-- Real proportions (standard pallet 120×80 cm, rack beams, dock doors, truck size)
-- Materials with texture: concrete floor with painted lane markings, corrugated metal walls, shrink-wrap on pallets, rubber dock seals
-- Warm interior lighting with ceiling lamps, daylight through dock doors, soft shadows
-- Ambient details: safety signs, fire extinguishers, yellow bollards, floor arrows
+## 9. Automation
 
-**Environment**
-- Warehouse interior with inbound docks on one side, outbound docks on the other
-- Outside: truck yard with parking lines, road, fence and gate, a few low-detail buildings and trees in the background
-- Trucks drive in, reverse to the dock, and drive away
-- Full city comes much later; the yard is enough for now
+- **Conveyors**: the inbound belt runs from the dock to the racks and pushes pallets straight into a free slot; the outbound belt runs from the racks to the shipping dock and loads the waiting truck. Pallets queue at the end when the destination is full. Belt speed is upgradable.
+- **Forklift**: rear-wheel steering, a two-stage mast that lifts pallets into the upper rack levels, and a warning light. Swap vehicles at the parking pad.
+- **Timers**: rack rows, conveyors and amenities are built by a construction site with builders, tape and sparks; vehicles arrive on a delivery truck and roll down a ramp. Both can be finished early with a fee or a rewarded ad.
 
-**Asset approach**
-- Use real 3D models (glTF/GLB) instead of code-generated boxes for trucks, racks, pallets, and the character
-- Sources: free and paid asset packs (check licenses), or AI 3D model generators for custom pieces
-- Keep phone performance: compressed models and textures, baked lighting where possible, one shadow light
+## 10. Quests, levels and events
 
-## 10. Tutorial v2
+- **Story quests** guide progression one at a time; **3 daily quests** reset every day; **achievements** are long-term badges; **client quests** are timed VIP requests.
+- **Company level** rises with 6 XP per shipped pallet plus quest rewards, and gates shop items, pads and the roster size.
+- **Random events** every few minutes: rush hour (more orders, better prices), surprise inspection (clean up the dropped pallets), VIP client (big timed order at double pay), late supplier (discounted delivery).
 
-1. "Drag to move your pompwagen"
-2. Supplier offer pops up (free first delivery): "Accept your first delivery!"
-3. "The truck is at the dock. Stand on the UNLOAD pad"
-4. "Store the pallet in the rack" (repeat for 3 small pallets, arrows guide)
-5. Customer order pops up: "FreshMart needs 2 pallets. You have 3 ✔. Accept!"
-6. "Load their truck at the outbound dock"
-7. Truck leaves: "+€X profit! Leftover stock waits for the next customer. You're the boss now — keep the trucks moving!"
+## 11. The city
 
-The tutorial ends right after that first profitable sale. Storage expansion is
-not part of it. The warehouse starts compact, and unlock pads for future rack
-rows sit on the empty floor for players to discover.
+The plot sits in a Dutch city block: ring roads with red bike lanes, sidewalks,
+zebra crossings and a roundabout; terraced houses with stepped gables, offices, a
+supermarket, a petrol station, parks and neighbouring halls; client shops with
+their own brand signs. Cars, vans and cyclists drive the lanes and stop for each
+other, the lights and the warehouse trucks; pedestrians walk the sidewalks. The
+yard has a fence, sliding gates, barriers that lift for arriving trucks, staff
+cars and a company flag.
 
-## 11. Build order
+## 12. UI
 
-Rebuild as a proper multi-file project (Vite + TypeScript + Three.js, as in the MVP plan). The one-shot `index.html` stays as a reference.
+Bottom navigation: **Shop · Workers · Quests · Orders · Map**, one panel at a
+time, each with a notification badge. The HUD shows money with a rolling
+counter, company level with an XP bar, reputation stars, stock, the tracked
+quest and running build timers. Dark navy panels, warehouse orange and safety
+yellow accents, 44 px touch targets, Baloo 2 and Nunito, iPhone safe areas,
+portrait and landscape.
 
-| Step | What | Done when |
-|---|---|---|
-| 1 | Project setup, warehouse + yard layout with placeholder shapes, pompwagen movement (section 8) | Driving feels good on iPhone and Samsung |
-| 2 | Racks with real slots, pallets, floor pads with text | Can store and take pallets from slots |
-| 3 | Supplier offers, trucks arrive and dock, unloading | A full delivery can be unloaded |
-| 4 | Customer orders with stock check, customer trucks, loading, profit | Full buy → store → sell loop works |
-| 5 | Money, pay-by-standing unlock pads, rack expansion, pompwagen upgrades | Profit can be turned into growth |
-| 6 | Save/load, tutorial v2 | New player learns the loop without help |
-| 7 | Visual upgrade: real 3D models, textures, lighting, yard details | Screenshot looks like a real game |
-| 8 | Sounds, polish, playtest on both phones | Arturs and friends keep playing |
+## 13. Monetisation hooks
 
-## 12. Open decisions (defaults chosen, change anytime)
+`AdService` is a stub that plays a short fake "sponsored break" and resolves
+true. It backs: finish a construction, delivery or training; a free temp worker;
+a free rush boost; double a quest reward; double the night shift. Always
+optional, never forced.
 
-- **Customer vehicles:** trucks and vans (default) vs buses
-- **Buying stock:** you pay suppliers upfront (default) vs pay after selling
-- **Missed deadlines:** reputation drop (default) vs money fine
-- **Offers:** random arrivals (default) vs choosing from an order board
-- **Camera:** high angled top-down follow that shows most of the warehouse, pinch/wheel zoom with limits, overview button for the whole yard (numbers in `src/config/camera.json`); first-person later
+## 14. Visual direction
+
+Clean, realistic-leaning mobile-tycoon look: real proportions (EUR pallets,
+rack beams, dock doors, truck sizes), textured concrete and corrugated metal,
+warm interior light, one shadow-casting sun. Everything static is merged per
+material or instanced; the performance budget is 60 fps on a mid-range phone,
+pixel ratio capped at 2, textures ≤ 1024².

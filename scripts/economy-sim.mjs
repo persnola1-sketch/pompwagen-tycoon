@@ -16,6 +16,10 @@ const economy = cfg('economy.json');
 const layout = cfg('layout.json');
 const vehicles = cfg('vehicles.json');
 const { products } = cfg('products.json');
+const tutorial = cfg('tutorial.json');
+const workersCfg = cfg('workers.json');
+const construction = cfg('construction.json');
+const quests = cfg('quests.json');
 
 // Player-model assumptions. These describe the human, not the game, so they
 // live here rather than in src/config.
@@ -83,23 +87,35 @@ function run(seed) {
     return items[items.length - 1];
   };
 
-  const tut = economy.tutorial;
+  const tut = tutorial;
+  // the tutorial ends with the warehouse bought, the first delivery paid for,
+  // the first sale banked and the first worker hired
+  const startCash =
+    economy.startMoney -
+    economy.warehouse.cost -
+    tut.firstDeliveryPallets * tut.firstDeliveryPricePerPallet +
+    tut.customerPallets * tut.customerPricePerPallet -
+    workersCfg.hireCosts[0];
   const s = {
     t: 0,
-    money: economy.startMoney + tut.customerPallets * tut.customerPricePerPallet + tut.completionBonus,
+    money: startCash,
+    workers: 1,
     rep: economy.reputation.start,
     rows: R.startRows,
     slots: new Array(R.rows.length * R.slotsPerRow).fill(null),
     speedLevel: 0,
     electric: false,
     shipped: tut.customerPallets,
+    conveyors: 0,
+    forklift: false,
+    xp: 0,
     pos: { ...P.load },
     carrying: [],
     busyUntil: 0,
     after: null,
     profit: 0,
   };
-  for (let i = 0; i < tut.freeDeliveryPallets - tut.customerPallets; i++) s.slots[i] = tut.product;
+  for (let i = 0; i < tut.firstDeliveryPallets - tut.customerPallets; i++) s.slots[i] = economy.tutorial.product;
 
   const events = { firstShip: Infinity, purchases: [], unlocks: {}, moneyAt: {} };
   const capacity = () => s.rows * R.slotsPerRow;
@@ -109,7 +125,14 @@ function run(seed) {
     return n;
   };
   const unlocked = () => products.filter((p) => s.shipped >= p.unlockShipped);
-  const stage = () => economy.stages[s.electric ? 1 : 0];
+  // company XP: 6 per shipped pallet, plus ~50% again from story and daily quests
+  const level = () => {
+    const xp = s.xp * 1.5;
+    let lvl = 1;
+    while (lvl < quests.companyLevelXp.length && xp >= quests.companyLevelXp[lvl]) lvl++;
+    return lvl;
+  };
+  const stage = () => economy.stages[s.forklift ? 2 : s.electric ? 1 : 0];
   const veh = () => (s.electric ? vehicles.electric : vehicles.pompwagen);
   const avgCost = {};
   for (const p of products) avgCost[p.id] = (p.buyMin + p.buyMax) / 2;
@@ -233,6 +256,7 @@ function run(seed) {
     s.money += revenue;
     s.profit += revenue - cost;
     s.shipped += n;
+    s.xp += n * quests.xpPerPalletShipped;
     if (unlocked().length > before) {
       for (const p of unlocked()) if (!(p.id in events.unlocks) && p.unlockShipped > 0) events.unlocks[p.id] = s.t;
     }
@@ -262,14 +286,17 @@ function run(seed) {
     const v = veh();
     return v.maxSpeed * (loaded ? v.loadedSpeedFactor : 1) * (1 + s.speedLevel * economy.payPads.speedUpgrade.speedBonusPerLevel);
   };
+  // every hired worker moves pallets alongside the player; conveyors shorten
+  // the long hauls because the belt does the walking
+  const workforce = () => 1 + (s.workers - 1) * 0.8 + s.conveyors * 0.35;
   function travel(target, onArrive) {
     const d = dist(s.pos, target);
     const time = d > 0.4 ? (d * MODEL.detour) / speed(s.carrying.length > 0) + MODEL.maneuver : 0;
-    s.busyUntil = s.t + time;
+    s.busyUntil = s.t + time / workforce();
     s.pos = { x: target.x, z: target.z };
     s.after = onArrive;
   }
-  const busy = (sec) => (s.busyUntil = Math.max(s.busyUntil, s.t) + sec);
+  const busy = (sec) => (s.busyUntil = Math.max(s.busyUntil, s.t) + sec / workforce());
   const cooldown = economy.interaction.actionCooldown;
 
   function nearestRow(pred) {
@@ -287,14 +314,30 @@ function run(seed) {
   }
   const rowSlots = (r) => Array.from({ length: R.slotsPerRow }, (_, c) => r * R.slotsPerRow + c);
 
+  const hireCost = (index) => {
+    const base = workersCfg.hireCosts;
+    return index < base.length
+      ? base[index]
+      : Math.round(base[base.length - 1] * Math.pow(workersCfg.hireCostGrowth, index - base.length + 1));
+  };
+
   function purchaseOptions() {
     const opts = [];
+    const lv = level();
     const su = economy.payPads.speedUpgrade;
     if (s.speedLevel < su.costs.length) opts.push({ what: `speed${s.speedLevel + 1}`, cost: su.costs[s.speedLevel], pad: P.upgradeSpeed });
     const ri = s.rows - R.startRows;
     if (s.rows < R.rows.length && ri < economy.payPads.rackRowCosts.length) opts.push({ what: `row${ri + 1}`, cost: economy.payPads.rackRowCosts[ri], pad: stripPoint(s.rows, s.pos) });
-    if (!s.electric) opts.push({ what: 'electric', cost: economy.payPads.electricPompwagen, pad: P.upgradeElectric });
-    return opts.sort((a, b) => a.cost - b.cost);
+    if (!s.electric && lv >= economy.payPads.levels.electric) opts.push({ what: 'electric', cost: economy.payPads.electricPompwagen, pad: P.upgradeElectric });
+    const staffCap = workersCfg.maxWorkersPerLevel[Math.min(lv, workersCfg.maxWorkersPerLevel.length) - 1];
+    if (s.workers < staffCap) opts.push({ what: `worker${s.workers + 1}`, cost: hireCost(s.workers), pad: P.office });
+    if (s.conveyors < 2 && s.shipped >= economy.payPads.conveyorUnlockShipped && lv >= economy.payPads.levels.conveyor) {
+      opts.push({ what: `conveyor${s.conveyors + 1}`, cost: s.conveyors === 0 ? economy.payPads.conveyorIn : economy.payPads.conveyorOut, pad: P.office });
+    }
+    if (s.electric && !s.forklift && lv >= economy.payPads.levels.forklift) opts.push({ what: 'forklift', cost: economy.payPads.forklift, pad: P.upgradeElectric });
+    // a real player values a new capability over yet another pair of hands
+    const weight = (o) => o.cost * (/^(electric|forklift|conveyor)/.test(o.what) ? 0.6 : 1);
+    return opts.sort((a, b) => weight(a) - weight(b));
   }
 
   function decide() {
@@ -370,9 +413,22 @@ function run(seed) {
         busy(opt.cost / rate);
         s.money -= opt.cost;
         if (opt.what.startsWith('speed')) s.speedLevel++;
-        else if (opt.what.startsWith('row')) s.rows++;
+        else if (opt.what.startsWith('row')) s.rows += 1;
+        else if (opt.what.startsWith('worker')) s.workers++;
+        else if (opt.what.startsWith('conveyor')) s.conveyors++;
+        else if (opt.what === 'forklift') s.forklift = true;
         else s.electric = true;
-        events.purchases.push({ what: opt.what, t: s.t, cost: opt.cost });
+        // rack rows, conveyors and vehicles now arrive after a build or delivery timer
+        const wait = opt.what.startsWith('row')
+          ? construction.construction.rackRow[Math.min(s.rows - R.startRows - 1, construction.construction.rackRow.length - 1)]
+          : opt.what.startsWith('conveyor')
+            ? construction.construction.conveyorIn
+            : opt.what === 'forklift'
+              ? construction.delivery.forklift
+              : opt.what === 'electric'
+                ? construction.delivery.electric
+                : 0;
+        events.purchases.push({ what: opt.what, t: s.t + wait, cost: opt.cost });
       });
     }
     return busy(0.25);
@@ -388,9 +444,13 @@ function run(seed) {
       if (fn) fn();
       if (s.t >= s.busyUntil) decide();
     }
+    // wages: every worker costs a wage each shift
+    if (Math.abs((s.t % (workersCfg.shiftMinutes * 60)) - 0) < MODEL.dt / 2 && s.t > 1) {
+      s.money = Math.max(0, s.money - (s.workers - 1) * workersCfg.wageMin * 2);
+    }
     s.t += MODEL.dt;
     if (s.t >= nextSample) {
-      events.moneyAt[nextSample / 60] = { profit: s.profit, shipped: s.shipped };
+      events.moneyAt[nextSample / 60] = { profit: s.profit, shipped: s.shipped, level: level() };
       nextSample += 60;
     }
   }
@@ -404,28 +464,42 @@ function pct(arr, p) {
 }
 const fmt = (sec) => (isFinite(sec) ? `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}` : 'never');
 
+function startCashReport() {
+  return (
+    economy.startMoney -
+    economy.warehouse.cost -
+    tutorial.firstDeliveryPallets * tutorial.firstDeliveryPricePerPallet +
+    tutorial.customerPallets * tutorial.customerPricePerPallet -
+    workersCfg.hireCosts[0]
+  );
+}
+
 const results = [];
 for (let i = 0; i < MODEL.runs; i++) results.push(run(MODEL.seed * 7919 + i));
 
 const firstOf = (e, prefix) => e.purchases.find((p) => p.what.startsWith(prefix))?.t ?? Infinity;
 const milestones = [
-  ['First profit (customer truck paid)', (e) => e.firstShip, [0, 60]],
-  ['First upgrade (any pad)', (e) => e.purchases[0]?.t ?? Infinity, [120, 180]],
-  ['First storage expansion', (e) => firstOf(e, 'row'), [300, 420]],
-  ['Electric pompwagen', (e) => firstOf(e, 'electric'), [900, 1200]],
+  ['First profit (customer truck paid)', (e) => e.firstShip, [0, 90]],
+  ['Second worker', (e) => firstOf(e, 'worker2'), [240, 600]],
+  ['First storage expansion', (e) => firstOf(e, 'row'), [90, 720]],
+  ['Third worker', (e) => firstOf(e, 'worker3'), [600, 1200]],
+  ['Electric pompwagen', (e) => firstOf(e, 'electric'), [750, 1500]],
+  ['First conveyor', (e) => firstOf(e, 'conveyor'), [1500, 2700]],
+  ['Forklift delivered', (e) => firstOf(e, 'forklift'), [2100, 4200]],
 ];
 
 // tutorial length estimate (same walking model)
 function tutorialEstimate() {
   const v = vehicles.pompwagen;
-  const tut = economy.tutorial;
+  const tut = { ...tutorial, product: economy.tutorial.product };
   const row0 = stripPoint(0, P.unload);
   const leg = (a, b, loaded) => (dist(a, b) * MODEL.detour) / (v.maxSpeed * (loaded ? v.loadedSpeedFactor : 1)) + MODEL.maneuver;
   const cd = economy.interaction.actionCooldown;
   let t = 4; // drive around a bit
   t += MODEL.reactionTime + 3; // read + accept offer
   t += Math.max(TRUCK.arrival, leg(layout.playerStart, P.unload, false));
-  for (let i = 0; i < tut.freeDeliveryPallets; i++) t += leg(P.unload, row0, true) + cd + (i < tut.freeDeliveryPallets - 1 ? leg(row0, P.unload, false) : 0);
+  t += economy.warehouse.buildSeconds + 6; // buying the plot warehouse and watching it go up
+  for (let i = 0; i < tut.firstDeliveryPallets; i++) t += leg(P.unload, row0, true) + cd + (i < tut.firstDeliveryPallets - 1 ? leg(row0, P.unload, false) : 0);
   t += MODEL.reactionTime + 3;
   let pick = 0;
   for (let i = 0; i < tut.customerPallets; i++) pick += leg(P.load, stripPoint(0, P.load), false) + cd + leg(stripPoint(0, P.load), P.load, true) + cd;
@@ -435,6 +509,7 @@ function tutorialEstimate() {
 
 const out = [];
 out.push(`Runs: ${MODEL.runs}, simulated ${MODEL.minutes} min after the tutorial`);
+out.push(`Start: €${Math.round(startCashReport())} and one worker`);
 out.push(`Truck arrival ${TRUCK.arrival.toFixed(1)} s, departure ${TRUCK.departure.toFixed(1)} s`);
 const v0 = vehicles.pompwagen;
 const dUR = dist(P.unload, stripPoint(0, P.unload));
@@ -455,11 +530,13 @@ for (const [name, fn, [lo, hi]] of milestones) {
   out.push(`| ${name} | ${fmt(pct(vals, 0.25))} | ${fmt(med)} | ${fmt(pct(vals, 0.75))} | ${fmt(lo)}–${fmt(hi)} | ${ok ? '✔' : '✖'} |`);
 }
 out.push('');
-out.push('| Minute | median profit | median pallets shipped |');
-out.push('|---|---|---|');
+out.push('| Minute | median profit | median pallets shipped | median company level |');
+out.push('|---|---|---|---|');
 for (const m of [1, 3, 5, 10, 15, 20, 30]) {
   if (m > MODEL.minutes) continue;
-  out.push(`| ${m} | €${Math.round(pct(results.map((e) => e.moneyAt[m]?.profit ?? 0), 0.5))} | ${pct(results.map((e) => e.moneyAt[m]?.shipped ?? 0), 0.5)} |`);
+  out.push(
+    `| ${m} | €${Math.round(pct(results.map((e) => e.moneyAt[m]?.profit ?? 0), 0.5))} | ${pct(results.map((e) => e.moneyAt[m]?.shipped ?? 0), 0.5)} | ${pct(results.map((e) => e.moneyAt[m]?.level ?? 1), 0.5)} |`,
+  );
 }
 out.push('');
 out.push('| Purchase (cheapest-first order) | median time |');

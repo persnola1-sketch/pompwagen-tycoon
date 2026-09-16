@@ -76,7 +76,9 @@ export class Quests {
   constructor(private state: GameState, private workers: Workers, private bus: EventBus) {
     this.bus.on('palletStored', () => this.bump('stored'));
     this.bus.on('workerLevelUp', () => this.bump('workerLevelUps'));
-    this.bus.on('orderShipped', ({ store }) => {
+    this.bus.on('orderShipped', ({ store, pallets }) => {
+      // every shipped pallet earns company XP on top of the quest rewards
+      this.addCompanyXp(Math.round(pallets * cfg.xpPerPalletShipped));
       const key = `client:${store}`;
       if (!this.counters[key]) {
         this.counters[key] = 1;

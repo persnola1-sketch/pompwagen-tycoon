@@ -107,15 +107,24 @@ export class PayPads {
     this.pads.setProgress('upgrade-speed', maxed ? 0 : (this.state.padProgress['upgrade-speed'] ?? 0) / SPEED.costs[lvl]);
   }
 
+  /** a pad is only buyable once the company has reached its level */
+  private levelOk(key: keyof typeof PP.levels): boolean {
+    return this.state.companyLevel >= PP.levels[key];
+  }
+
   /** the vehicle pad sells the electric pompwagen first, then the forklift */
   private vehicleOffer(): { item: 'electric' | 'forklift' | null; cost: number; lines: string[]; icon: string } {
     if (!this.state.electric) {
       const coming = this.timers.has('electric');
-      return { item: coming ? null : 'electric', cost: PP.electricPompwagen, lines: coming ? ['ELECTRIC', 'ON THE WAY 🚚'] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`], icon: '🔋' };
+      const locked = !this.levelOk('electric');
+      const lines = coming ? ['ELECTRIC', 'ON THE WAY 🚚'] : locked ? ['ELECTRIC', `LEVEL ${PP.levels.electric} 🔒`] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`];
+      return { item: coming || locked ? null : 'electric', cost: PP.electricPompwagen, lines, icon: '🔋' };
     }
     if (!this.state.forklift) {
       const coming = this.timers.has('forklift');
-      return { item: coming ? null : 'forklift', cost: PP.forklift, lines: coming ? ['FORKLIFT', 'ON THE WAY 🚚'] : ['FORKLIFT', eur(PP.forklift)], icon: '🚜' };
+      const locked = !this.levelOk('forklift');
+      const lines = coming ? ['FORKLIFT', 'ON THE WAY 🚚'] : locked ? ['FORKLIFT', `LEVEL ${PP.levels.forklift} 🔒`] : ['FORKLIFT', eur(PP.forklift)];
+      return { item: coming || locked ? null : 'forklift', cost: PP.forklift, lines, icon: '🚜' };
     }
     return { item: null, cost: Infinity, lines: ['REACH TRUCK', 'COMING SOON'], icon: '🏗️' };
   }
@@ -133,7 +142,7 @@ export class PayPads {
 
   /** which row gets the next upper level, and what it costs */
   private upperOffer(): { row: number; level: number; cost: number } | null {
-    if (!this.state.forklift) return null;
+    if (!this.state.forklift || !this.levelOk('upperLevel')) return null;
     let best = -1;
     for (let r = 0; r < this.state.rackRows; r++) {
       if (this.timers.has('upperLevel', r)) continue;
@@ -160,7 +169,7 @@ export class PayPads {
 
   /** conveyors unlock once the warehouse is busy enough to need them */
   get conveyorsUnlocked(): boolean {
-    return this.state.stats.shipped >= PP.conveyorUnlockShipped;
+    return this.state.stats.shipped >= PP.conveyorUnlockShipped && this.levelOk('conveyor');
   }
 
   private refreshConveyorPad(kind: 'In' | 'Out'): void {

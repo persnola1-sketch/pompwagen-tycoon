@@ -62,12 +62,12 @@
     "rackRowCosts": [
       300,
       1400,
-      2000,
-      2800,
+      2400,
       3600,
-      4500
+      5200,
+      7000
     ],
-    "electricPompwagen": 1100,
+    "electricPompwagen": 1600,
     "speedUpgrade": {
       "costs": [
         150,
@@ -76,14 +76,20 @@
       ],
       "speedBonusPerLevel": 0.12
     },
-    "forklift": 2500,
+    "forklift": 5000,
     "upperLevelCosts": [
-      500,
-      900
+      1800,
+      3200
     ],
-    "conveyorIn": 3000,
-    "conveyorOut": 4200,
-    "conveyorUnlockShipped": 60
+    "conveyorIn": 4000,
+    "conveyorOut": 6000,
+    "conveyorUnlockShipped": 60,
+    "levels": {
+      "electric": 3,
+      "forklift": 5,
+      "conveyor": 4,
+      "upperLevel": 5
+    }
   },
   "tutorial": {
     "product": "water"

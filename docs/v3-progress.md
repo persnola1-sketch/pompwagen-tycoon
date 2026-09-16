@@ -18,7 +18,7 @@ Tracks what is built per phase of `docs/update-v3.md`, so a new session can cont
 | 12 Ad hooks | done | `services/AdService.ts` fake rewarded break; 📺 buttons for finish construction/delivery (`TimersHud`), finish training + free temp worker (`WorkersPanel`), double quest reward (`QuestPanel`), double night shift (`ShiftReport`), free rush boost and finish-all (shop Boosts). All optional, never forced
 | 13 Animations & effects | done | rolling dock doors, blinking truck indicators, money counter roll-up + coins flying to the HUD, `world/Ambience.ts` (dust motes, birds), idle phone check, forklift mast tilt, button press bounce, procedural background music with a toggle, `ui/SettingsPanel.ts` (sound, music, tips, graphics quality, reset)
 | 14 UI overhaul | done | design tokens (navy surfaces, orange/yellow accents, radii, shadows, 44 px targets), Baloo 2 + Nunito from Google Fonts with fallbacks, order cards rebuilt (logo, contact portrait, product lines, stock checks, countdown ring, big buttons), coin icon on the money chip, landscape media query
-| 15 Balance, save, perf | todo | |
+| 15 Balance, save, perf | done | economy retuned and gated by company level (`npm run sim` passes every band, see `docs/economy.md`), sim rewritten for workers/levels/timers, save covers every system with v1→v3 migration, graphics quality (auto/low/medium/high) also scales traffic and pedestrians, dev panel has money/level/timers/event/skip/reset, tutorial made robust when the player runs ahead
 
 ## Testing
 

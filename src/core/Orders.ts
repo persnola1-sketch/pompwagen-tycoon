@@ -437,7 +437,7 @@ export class Orders {
     this.state.stats.ordersOnTime++;
     this.loyalty?.finishOrder(o.clientId, true, o.lines.reduce((n, l) => n + l.loaded, 0), revenue);
     if (fast) this.state.addReputation(economy.customer.fastDeliveryRepBonus);
-    this.bus.emit('orderShipped', { orderId: o.id, store: o.store, revenue, profit, fast });
+    this.bus.emit('orderShipped', { orderId: o.id, store: o.store, pallets: o.lines.reduce((n, l) => n + l.loaded, 0), revenue, profit, fast });
     this.bus.emit('truckLeaving', { kind: 'customer', orderId: o.id });
   }
 

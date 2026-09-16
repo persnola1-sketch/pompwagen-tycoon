@@ -91,9 +91,23 @@ export class Tutorial {
     this.advance();
   }
 
+  /** jump straight to a step (used when the player runs ahead of Henk) */
+  private jumpTo(id: string): void {
+    const i = STEPS.findIndex((s) => s.id === id);
+    if (i < 0 || i <= this.stepIndex) return;
+    this.stepIndex = i - 1;
+    this.advance();
+  }
+
   update(): void {
     if (!this.active) return;
     const id = this.currentStepId;
+    // the plot steps are done the moment the warehouse stands, however the
+    // player got there — they may well pay before tapping through the welcome
+    if (this.state.warehouseBuilt && (id === 'welcome' || id === 'buy')) {
+      this.jumpTo('opened');
+      return;
+    }
     if (id === 'offer' && !this.orders.pendingSupplier && !this.orders.activeSupplier) {
       // declined or expired: offer it again
       this.offerFirstDelivery();

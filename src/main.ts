@@ -324,6 +324,7 @@ class Game {
       this.sound.enabled = v.sound;
       this.sound.musicEnabled = v.music;
       this.root.setQuality(v.quality);
+      this.city.setQuality(v.quality);
       this.ambience.setMotesVisible(v.quality !== 'low');
       this.save.save();
     };
