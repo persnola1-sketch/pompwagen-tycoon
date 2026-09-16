@@ -80,7 +80,10 @@
     "upperLevelCosts": [
       500,
       900
-    ]
+    ],
+    "conveyorIn": 3000,
+    "conveyorOut": 4200,
+    "conveyorUnlockShipped": 60
   },
   "tutorial": {
     "product": "water"

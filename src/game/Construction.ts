@@ -28,6 +28,8 @@ export class Construction {
   /** extra completion handlers per item (conveyors, amenities …) */
   onItemDone: Record<string, (job: Job) => void> = {};
   onRefreshPads: (() => void) | null = null;
+  /** set once the conveyor system exists (it is created after this) */
+  conveyors: { sync: () => void } | null = null;
   onSound: ((kind: 'build' | 'horn' | 'brake' | 'beep') => void) | null = null;
 
   constructor(
@@ -86,9 +88,17 @@ export class Construction {
       case 'secondDock':
         return { x: layout.docks.outboundX - 2, z: layout.docks.doorZ[1], w: 3.5, d: layout.docks.doorWidth + 1 };
       case 'conveyorIn':
-        return { x: layout.conveyors.inbound.x, z: layout.conveyors.inbound.z, w: layout.conveyors.length + 1, d: 2 };
-      case 'conveyorOut':
-        return { x: layout.conveyors.outbound.x, z: layout.conveyors.outbound.z, w: layout.conveyors.length + 1, d: 2 };
+      case 'conveyorOut': {
+        // a site box around the whole belt path
+        const path = job.item === 'conveyorIn' ? layout.conveyors.inbound.path : layout.conveyors.outbound.path;
+        const xs = path.map((p) => p[0]);
+        const zs = path.map((p) => p[1]);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minZ = Math.min(...zs);
+        const maxZ = Math.max(...zs);
+        return { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, w: maxX - minX + 1.4, d: maxZ - minZ + 1.4 };
+      }
       default:
         return { x: 0, z: 0, w: 3, d: 3 };
     }
@@ -164,6 +174,19 @@ export class Construction {
         this.bus.emit('upgradeBought', { upgrade: 'forklift' });
         this.bus.emit('toast', { text: 'Forklift delivered! Switch vehicles at the parking pad', kind: 'good' });
         break;
+      case 'conveyorIn':
+      case 'conveyorOut': {
+        const kind = job.item === 'conveyorIn' ? 'in' : 'out';
+        if (kind === 'in') this.state.conveyorIn = true;
+        else this.state.conveyorOut = true;
+        this.conveyors?.sync();
+        this.bus.emit('upgradeBought', { upgrade: job.item });
+        this.bus.emit('toast', {
+          text: kind === 'in' ? 'Inbound conveyor running! Drop pallets at the dock end' : 'Outbound conveyor running! It loads the truck for you',
+          kind: 'good',
+        });
+        break;
+      }
       case 'coffeeMachine':
         this.workers.coffeeMachine = true;
         this.bus.emit('upgradeBought', { upgrade: 'coffeeMachine' });

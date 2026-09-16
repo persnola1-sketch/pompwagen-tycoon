@@ -110,6 +110,31 @@ export class Sound {
     this.tone(523, 0.14, 'sine', 0.15, undefined, 0.2);
     this.tone(659, 0.25, 'sine', 0.16, undefined, 0.3);
   }
+  private humOsc: OscillatorNode | null = null;
+  private humGain: GainNode | null = null;
+
+  /** looping conveyor motor hum; level 0 stops it */
+  setHum(level: number): void {
+    this.ensure();
+    if (!this.ctx || !this.master || this.ctx.state !== 'running') return;
+    if (!this.humOsc) {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = 62;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 260;
+      const g = this.ctx.createGain();
+      g.gain.value = 0;
+      osc.connect(filter).connect(g).connect(this.master);
+      osc.start();
+      this.humOsc = osc;
+      this.humGain = g;
+    }
+    const target = this.enabled ? level * 0.05 : 0;
+    this.humGain!.gain.setTargetAtTime(target, this.ctx.currentTime, 0.25);
+  }
+
   /** short voice blip for the guide's typewriter text */
   blip(): void {
     this.tone(520 + Math.random() * 260, 0.045, 'triangle', 0.07, 400);

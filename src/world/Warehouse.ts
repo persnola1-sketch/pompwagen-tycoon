@@ -325,7 +325,7 @@ export class Warehouse {
     };
     const p = layout.pads;
     for (const bx of [-11.8, 11.8]) {
-      bollard(bx, -11.6);
+      bollard(bx, -10.4);
       bollard(bx, 5.4);
     }
     bollard(p.office.x - 1.7, HALF_D - 1.9);

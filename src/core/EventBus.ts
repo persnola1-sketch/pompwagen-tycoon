@@ -42,6 +42,9 @@ export type GameEvents = {
   workerAction: { workerId: number; action: 'unload' | 'store' | 'pick' | 'load' | 'drop'; product: string; x: number; z: number };
   palletDropped: { workerId: number; product: string };
   clerkDecided: { kind: TruckKind; accepted: boolean; text: string };
+  conveyorLoaded: { kind: 'in' | 'out'; product: string };
+  conveyorDelivered: { kind: 'in' | 'out'; product: string; x: number; z: number };
+  conveyorRunning: { running: boolean };
   jobStarted: { job: Job };
   jobDone: { job: Job };
   deliveryDispatched: { job: Job };

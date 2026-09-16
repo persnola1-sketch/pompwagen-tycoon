@@ -9,6 +9,7 @@ import { Player } from '../world/Player';
 import { Racks, inRowStrip, slotPosition } from '../world/Racks';
 import { slotIndex } from '../core/GameState';
 import { FallenPallets } from '../world/workers/FallenPallets';
+import { Conveyors } from './Conveyors';
 
 const PER_ROW = layout.rackRows.slotsPerRow;
 
@@ -26,6 +27,7 @@ export class Interactions {
   /** off while the warehouse is not built or during cutscenes */
   enabled = true;
   fallen: FallenPallets | null = null;
+  conveyors: Conveyors | null = null;
   private cooldown = 0;
   private officeLatch = false;
 
@@ -65,7 +67,7 @@ export class Interactions {
     this.cooldown = Math.max(0, this.cooldown - dt);
     if (this.cooldown > 0) return;
     if (this.tryPickFallen(px, pz)) return;
-    if (this.tryUnload(px, pz) || this.tryLoad(px, pz)) return;
+    if (this.tryUnload(px, pz) || this.tryLoad(px, pz) || this.tryBelt(px, pz)) return;
     for (let row = 0; row < this.state.rackRows; row++) {
       if (!inRowStrip(row, px, pz)) continue;
       if (this.tryStore(row, px) || this.tryTake(row, px)) return;
@@ -87,6 +89,27 @@ export class Interactions {
     this.bus.emit('palletPicked', { from: 'rack', product: pid });
     this.done();
     return true;
+  }
+
+  /** standing at a belt's loading end drops a pallet onto it */
+  private tryBelt(px: number, pz: number): boolean {
+    const c = this.conveyors;
+    if (!c || !this.player.carrying) return false;
+    for (const kind of ['out', 'in'] as const) {
+      if (!c.atInput(kind, px, pz)) continue;
+      const cargo = this.player.cargo;
+      for (let i = cargo.length - 1; i >= 0; i--) {
+        const pid = cargo[i];
+        // the outbound belt only takes what the customer ordered
+        if (kind === 'out' && this.orders.customerNeed(pid) <= 0) continue;
+        if (!c.push(kind, pid)) break;
+        this.player.setCargo(cargo.filter((_, k) => k !== i));
+        this.sound.palletDown();
+        this.done();
+        return true;
+      }
+    }
+    return false;
   }
 
   private tryUnload(px: number, pz: number): boolean {

@@ -10,7 +10,7 @@ Tracks what is built per phase of `docs/update-v3.md`, so a new session can cont
 | 4 Workers | done | `core/workers/*` (roster, candidates, XP/levels, wages, temp workers, clerk rules, offline shift), `core/Pathfinding.ts` A*, `game/WorkerAI.ts`, `world/workers/*` actors + status bubbles + fallen pallets, `ui/WorkersPanel.ts`, `ui/ShiftReport.ts` |
 | 5 Construction & delivery timers | done | `core/Timers.ts` jobs (saved), `game/Construction.ts` (sites, delivery truck roll-out, effects), `world/construction/ConstructionSite.ts`, `ui/TimersHud.ts` finish-now (ad stub `services/AdService.ts` or fee), `construction.json` |
 | 6 Forklift + high racks | done | `world/Forklift.ts` (rear-wheel steering, 2-stage mast), 3 rack levels in `GameState` slot indexing + `Racks.ts`, parking pad switches vehicle, upper-level pads per row, forklift-driver workers drive one too, reach truck shown "coming soon" |
-| 7 Conveyors | todo | |
+| 7 Conveyors | done | `world/Conveyor.ts` (polyline belts, scrolling texture, drums, instanced pallets, queueing), `game/Conveyors.ts` (inbound auto-stores into racks, outbound auto-loads the truck), pads gated on shipped count, built through construction timers, motor hum |
 | 8 Quests | todo | |
 | 9 City | todo | |
 | 10 Clients & brands | todo | |

@@ -48,6 +48,8 @@ export class PayPads {
     this.refreshElectricPad();
     this.refreshUpperPad();
     this.refreshParkingPad();
+    this.refreshConveyorPad('In');
+    this.refreshConveyorPad('Out');
     this.refreshWarehousePad();
   }
 
@@ -156,6 +158,36 @@ export class PayPads {
     this.pads.setProgress('upgrade-upper', o ? (this.state.padProgress['upgrade-upper'] ?? 0) / o.cost : 0);
   }
 
+  /** conveyors unlock once the warehouse is busy enough to need them */
+  get conveyorsUnlocked(): boolean {
+    return this.state.stats.shipped >= PP.conveyorUnlockShipped;
+  }
+
+  private refreshConveyorPad(kind: 'In' | 'Out'): void {
+    const id = `conveyor-${kind.toLowerCase()}`;
+    const path = kind === 'In' ? layout.conveyors.inbound.path : layout.conveyors.outbound.path;
+    const [x, z] = path[0];
+    const owned = kind === 'In' ? this.state.conveyorIn : this.state.conveyorOut;
+    const coming = this.timers.has(`conveyor${kind}`);
+    const cost = kind === 'In' ? PP.conveyorIn : PP.conveyorOut;
+    const title = kind === 'In' ? 'INBOUND BELT' : 'OUTBOUND BELT';
+    if (owned) {
+      this.pads.remove(id);
+      return;
+    }
+    const ready = this.conveyorsUnlocked && !coming;
+    const lines = coming
+      ? [title, 'BUILDING 🏗️']
+      : this.conveyorsUnlocked
+        ? [title, eur(cost)]
+        : [title, `SHIP ${PP.conveyorUnlockShipped} 🔒`];
+    const accent = ready ? '#38d15e' : '#aeb5c2';
+    if (!this.pads.has(id)) this.pads.create(id, x, z, lines, accent, { withBar: true, locked: !ready, icon: '📦' });
+    else this.pads.setLabel(id, lines, accent, !ready);
+    this.pads.setActive(id, ready);
+    this.pads.setProgress(id, ready ? (this.state.padProgress[id] ?? 0) / cost : 0);
+  }
+
   private refreshParkingPad(): void {
     const p = layout.pads.parking;
     const lines = this.state.forklift ? ['PARKING', 'switch vehicle'] : ['PARKING', 'forklift bay'];
@@ -196,6 +228,15 @@ export class PayPads {
       this.refreshElectricPad();
       this.bus.emit('toast', { text: `${veh.item === 'electric' ? 'Electric pompwagen' : 'Forklift'} ordered — the delivery truck is on its way`, kind: 'good' });
     });
+
+    for (const kind of ['In', 'Out'] as const) {
+      const owned = kind === 'In' ? this.state.conveyorIn : this.state.conveyorOut;
+      const cost = kind === 'In' ? PP.conveyorIn : PP.conveyorOut;
+      this.pay(`conveyor-${kind.toLowerCase()}`, dt, owned || this.timers.has(`conveyor${kind}`) || !this.conveyorsUnlocked ? Infinity : cost, () => {
+        this.timers.start('construction', `conveyor${kind}`, 0, kind === 'In' ? 'Inbound conveyor' : 'Outbound conveyor');
+        this.refreshConveyorPad(kind);
+      });
+    }
 
     const up = this.upperOffer();
     this.pay('upgrade-upper', dt, up ? up.cost : Infinity, () => {

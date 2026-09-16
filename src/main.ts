@@ -44,6 +44,7 @@ import { Timers } from './core/Timers';
 import { Construction } from './game/Construction';
 import { TimersHud } from './ui/TimersHud';
 import { AdService } from './services/AdService';
+import { Conveyors } from './game/Conveyors';
 
 class Game {
   private bus = new EventBus();
@@ -58,6 +59,7 @@ class Game {
   private ads = new AdService();
   private workerAI: WorkerAI;
   private fallen: FallenPallets;
+  private conveyors: Conveyors;
   private workersPanel: WorkersPanel;
   private shiftReport = new ShiftReportUi();
   private sound = new Sound();
@@ -119,6 +121,9 @@ class Game {
     this.effects = new Effects(scene);
     this.henk = new Henk(scene);
     this.fallen = new FallenPallets(scene);
+    this.conveyors = new Conveyors(scene, this.state, this.orders, this.bus, this.racks, this.warehouse.colliders);
+    this.save.register('conveyors', this.conveyors);
+    this.conveyors.sync();
     scene.add(this.pads.group);
 
     this.supplierTruck = new Truck('supplier', scene);
@@ -141,8 +146,9 @@ class Game {
 
     this.interactions = new Interactions(this.state, this.orders, this.bus, this.pads, this.player, this.racks, this.sound);
     this.interactions.fallen = this.fallen;
+    this.interactions.conveyors = this.conveyors;
     this.interactions.onCargoChanged = (): void => this.updateTrucks();
-    this.workerAI = new WorkerAI(this.state, this.orders, this.workers, this.bus, this.racks, this.fallen, this.warehouse.colliders, scene);
+    this.workerAI = new WorkerAI(this.state, this.orders, this.workers, this.bus, this.racks, this.fallen, this.warehouse.colliders, this.conveyors, scene);
     this.workerAI.sync();
     this.workersPanel = new WorkersPanel(this.workers, this.state, this.bus);
     this.workersPanel.onClose = (): void => this.sound.click();
@@ -163,6 +169,7 @@ class Game {
     this.payPads = new PayPads(this.state, this.bus, this.pads, this.player, this.effects, this.sound, this.save, this.timers);
     this.payPads.onWarehouseBought = (): void => this.startConstruction();
     this.construction = new Construction(scene, this.state, this.bus, this.timers, this.racks, this.workers, this.player, this.effects);
+    this.construction.conveyors = this.conveyors;
     this.construction.onRefreshPads = (): void => this.payPads.refreshAll();
     this.construction.onSound = (k): void => {
       if (k === 'build') this.sound.build();
@@ -237,6 +244,7 @@ class Game {
       vehicle: this.player.vehicle,
       upper: this.state.upperLevels.slice(0, this.state.rackRows),
       capacity: this.state.capacity,
+      belts: [this.state.conveyorIn, this.state.conveyorOut],
       calls: this.root.renderer.info.render.calls,
     };
   }
@@ -487,8 +495,16 @@ class Game {
       this.save.save();
     });
     this.bus.on('rackRowBuilt', () => this.tutorial.tip('firstRackRow'));
+    this.bus.on('conveyorRunning', ({ running }) => this.sound.setHum(running ? 1 : 0));
+    this.bus.on('conveyorLoaded', () => this.sound.palletDown());
+    this.bus.on('conveyorDelivered', ({ kind, x, z }) => {
+      this.sound.palletUp();
+      this.effects.dust(x, z, 0.7);
+      if (kind === 'out') this.updateTrucks();
+    });
     this.bus.on('upgradeBought', ({ upgrade }) => {
       if (upgrade === 'electric') this.tutorial.tip('firstElectric');
+      if (upgrade === 'conveyorIn' || upgrade === 'conveyorOut') this.tutorial.tip('firstConveyor');
     });
     this.bus.on('productUnlocked', () => {
       this.sound.fanfare();
@@ -548,6 +564,7 @@ class Game {
     if (this.state.warehouseBuilt && !this.build) {
       this.timers.update(dt);
       this.construction.update(dt, camera);
+      this.conveyors.update(dt);
     }
     if (this.state.warehouseBuilt && !this.build) {
       this.workers.update(dt, this.state.forklift);

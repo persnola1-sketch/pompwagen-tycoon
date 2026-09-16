@@ -13,6 +13,7 @@ import { TOTAL_SLOTS, slotLevel, slotRow } from '../core/GameState';
 import { resolveCircle } from '../world/Pompwagen';
 import { WorkerActor } from '../world/workers/WorkerActor';
 import { FallenPallets } from '../world/workers/FallenPallets';
+import { Conveyors } from './Conveyors';
 
 type Task =
   | { kind: 'idle' }
@@ -20,6 +21,7 @@ type Task =
   | { kind: 'toStore'; slot: number }
   | { kind: 'toPick'; slot: number; product: string }
   | { kind: 'toLoad' }
+  | { kind: 'toBelt'; belt: 'in' | 'out' }
   | { kind: 'toBreak' }
   | { kind: 'toHome' };
 
@@ -62,6 +64,7 @@ export class WorkerAI {
     private racks: Racks,
     private fallen: FallenPallets,
     private colliders: AABB[],
+    private conveyors: Conveyors,
     parent: THREE.Object3D,
   ) {
     const W = layout.warehouse.width / 2 + 6;
@@ -72,6 +75,9 @@ export class WorkerAI {
     bus.on('workerLeft', ({ workerId }) => this.despawn(workerId));
     bus.on('rackRowBuilt', () => {
       this.gridDirty = true;
+    });
+    bus.on('upgradeBought', ({ upgrade }) => {
+      if (upgrade === 'conveyorIn' || upgrade === 'conveyorOut') this.gridDirty = true;
     });
     bus.on('workerLevelUp', ({ workerId }) => {
       const a = this.agents.find((x) => x.worker.id === workerId);
@@ -228,8 +234,23 @@ export class WorkerAI {
     if (a.cargo.length) {
       const top = a.cargo[a.cargo.length - 1];
       if (isLoader && this.orders.activeCustomer && this.orders.customerNeed(top) > 0) {
+        // the outbound belt loads the truck by itself, so use it whenever it is not a long detour
+        const inp = this.conveyors.inputPoint('out');
+        if (inp && this.conveyors.canAccept('out') && dist(a, inp) < dist(a, layout.pads.load) * 1.35) {
+          if (a.task.kind !== 'toBelt' || a.task.belt !== 'out') this.setTask(a, { kind: 'toBelt', belt: 'out' }, inp);
+          return;
+        }
         if (a.task.kind !== 'toLoad') this.setTask(a, { kind: 'toLoad' }, layout.pads.load);
         return;
+      }
+      // the inbound belt stores pallets for us: drop them at its loading end
+      const beltIn = this.conveyors.inputPoint('in');
+      if (beltIn && this.conveyors.canAccept('in') && this.freeSlot(a) >= 0) {
+        const slot = this.freeSlot(a);
+        if (dist(a, beltIn) < dist(a, this.slotPoint(slot)) * 1.35) {
+          if (a.task.kind !== 'toBelt' || a.task.belt !== 'in') this.setTask(a, { kind: 'toBelt', belt: 'in' }, beltIn);
+          return;
+        }
       }
       const slot = this.freeSlot(a);
       if (slot < 0) {
@@ -352,6 +373,29 @@ export class WorkerAI {
             a.actionCooldown = 0.5;
             return;
           }
+        }
+        a.task = { kind: 'idle' };
+        break;
+      }
+      case 'toBelt': {
+        const belt = a.task.belt;
+        const pid = a.cargo[a.cargo.length - 1];
+        if (pid === undefined) {
+          a.task = { kind: 'idle' };
+          break;
+        }
+        if (!this.conveyors.push(belt, pid)) {
+          a.waitReason = 'belt full';
+          a.actionCooldown = 0.6;
+          return;
+        }
+        a.cargo.pop();
+        a.actor.setCargo(a.cargo);
+        this.workers.addXp(w);
+        this.bus.emit('workerAction', { workerId: w.id, action: 'store', product: pid, x: a.x, z: a.z });
+        if (a.cargo.length) {
+          a.actionCooldown = 0.45;
+          return;
         }
         a.task = { kind: 'idle' };
         break;
