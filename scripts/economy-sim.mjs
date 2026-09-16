@@ -7,7 +7,7 @@
  * "reasonable new player" many times. Prints milestone timings used in
  * docs/economy.md. The offer-generation rules mirror src/core/Orders.ts.
  *
- * Env: RUNS (default 400), MINUTES (default 30), SEED (default 1)
+ * Env: RUNS (default 200), MINUTES (default 70), SEED (default 1)
  */
 import { readFileSync } from 'node:fs';
 
@@ -24,8 +24,8 @@ const quests = cfg('quests.json');
 // Player-model assumptions. These describe the human, not the game, so they
 // live here rather than in src/config.
 const MODEL = {
-  runs: Number(process.env.RUNS ?? 400),
-  minutes: Number(process.env.MINUTES ?? 30),
+  runs: Number(process.env.RUNS ?? 200),
+  minutes: Number(process.env.MINUTES ?? 70),
   seed: Number(process.env.SEED ?? 1),
   dt: 0.1,
   reactionTime: 2.5, // s to read a popup and tap accept/decline

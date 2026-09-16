@@ -1,10 +1,12 @@
 # Pompwagen Tycoon
 
-Mobile-first 3D warehouse middleman tycoon: accept supplier deliveries, unload
-pallets with your pompwagen, store them in racks, sell to customer trucks, and
-grow the warehouse. Built with Vite + TypeScript + Three.js.
+Mobile-first 3D warehouse middleman tycoon. Start on an empty plot in a Dutch
+city, buy and build your warehouse, then accept supplier deliveries, store
+pallets in racks, sell to customer trucks, hire a team, and automate with
+conveyors and a forklift. Built with Vite + TypeScript + Three.js.
 
-Design docs: `docs/game-design.md`, `docs/mvp-plan.md`, `docs/economy.md`.
+Design docs: `docs/game-design.md`, `docs/economy.md`, `docs/v3-progress.md`
+(what shipped per phase), `docs/mvp-plan.md` (the original plan).
 Coding rules for AI agents: `CLAUDE.md`. Asset licenses: `CREDITS.md`.
 
 ## Run locally
@@ -35,6 +37,18 @@ iPhone to play fullscreen.
 - drag anywhere to drive
 - pinch with two fingers to zoom (this never moves the pompwagen)
 - tap 🗺️ for the whole-map overview; tap the world to return
+- bottom bar: Shop · Workers · Quests · Orders · Map
+- ⚙️ for sound, music, tips and graphics quality
+
+## Dev tools
+
+Add `?dev` to the URL for the fps/draw-call readout plus buttons for money,
+company level, finishing timers, spawning an event, skipping the tutorial and
+resetting the save.
+
+```bash
+npm run sim   # economy pacing simulation; exits non-zero if a median misses its band
+```
 
 ## Build & preview production
 
