@@ -46,6 +46,8 @@ export class PayPads {
     this.refreshRowPads();
     this.refreshSpeedPad();
     this.refreshElectricPad();
+    this.refreshUpperPad();
+    this.refreshParkingPad();
     this.refreshWarehousePad();
   }
 
@@ -103,17 +105,62 @@ export class PayPads {
     this.pads.setProgress('upgrade-speed', maxed ? 0 : (this.state.padProgress['upgrade-speed'] ?? 0) / SPEED.costs[lvl]);
   }
 
+  /** the vehicle pad sells the electric pompwagen first, then the forklift */
+  private vehicleOffer(): { item: 'electric' | 'forklift' | null; cost: number; lines: string[]; icon: string } {
+    if (!this.state.electric) {
+      const coming = this.timers.has('electric');
+      return { item: coming ? null : 'electric', cost: PP.electricPompwagen, lines: coming ? ['ELECTRIC', 'ON THE WAY 🚚'] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`], icon: '🔋' };
+    }
+    if (!this.state.forklift) {
+      const coming = this.timers.has('forklift');
+      return { item: coming ? null : 'forklift', cost: PP.forklift, lines: coming ? ['FORKLIFT', 'ON THE WAY 🚚'] : ['FORKLIFT', eur(PP.forklift)], icon: '🚜' };
+    }
+    return { item: null, cost: Infinity, lines: ['REACH TRUCK', 'COMING SOON'], icon: '🏗️' };
+  }
+
   private refreshElectricPad(): void {
     const p = layout.pads.upgradeElectric;
-    const owned = this.state.electric;
-    const coming = this.timers.has('electric');
-    const lines = owned ? ['ELECTRIC', 'OWNED ✔'] : coming ? ['ELECTRIC', 'ON THE WAY 🚚'] : ['ELECTRIC', `POMPWAGEN ${eur(PP.electricPompwagen)}`];
-    const accent = owned || coming ? '#8a92a5' : '#38d15e';
-    const locked = owned || coming;
-    if (!this.pads.has('upgrade-electric')) this.pads.create('upgrade-electric', p.x, p.z, lines, accent, { withBar: true, locked, icon: '🔋' });
-    else this.pads.setLabel('upgrade-electric', lines, accent, locked);
+    const o = this.vehicleOffer();
+    const locked = o.item === null;
+    const accent = locked ? '#8a92a5' : '#38d15e';
+    if (!this.pads.has('upgrade-electric')) this.pads.create('upgrade-electric', p.x, p.z, o.lines, accent, { withBar: true, locked, icon: o.icon });
+    else this.pads.setLabel('upgrade-electric', o.lines, accent, locked, o.icon);
     this.pads.setActive('upgrade-electric', !locked);
-    this.pads.setProgress('upgrade-electric', locked ? 0 : (this.state.padProgress['upgrade-electric'] ?? 0) / PP.electricPompwagen);
+    this.pads.setProgress('upgrade-electric', locked ? 0 : (this.state.padProgress['upgrade-electric'] ?? 0) / o.cost);
+  }
+
+  /** which row gets the next upper level, and what it costs */
+  private upperOffer(): { row: number; level: number; cost: number } | null {
+    if (!this.state.forklift) return null;
+    let best = -1;
+    for (let r = 0; r < this.state.rackRows; r++) {
+      if (this.timers.has('upperLevel', r)) continue;
+      if (this.state.upperLevels[r] >= layout.rackRows.levels - 1) continue;
+      if (best < 0 || this.state.upperLevels[r] < this.state.upperLevels[best]) best = r;
+    }
+    if (best < 0) return null;
+    const level = this.state.upperLevels[best] + 1;
+    const cost = PP.upperLevelCosts[level - 1] ?? Infinity;
+    return { row: best, level, cost };
+  }
+
+  private refreshUpperPad(): void {
+    const p = layout.pads.upgradeUpper;
+    const o = this.upperOffer();
+    const lines = !this.state.forklift ? ['UPPER RACKS', 'NEEDS FORKLIFT 🔒'] : o ? [`RACK LEVEL ${o.level + 1}`, `ROW ${rowLetter(o.row)} · ${eur(o.cost)}`] : ['UPPER RACKS', 'ALL BUILT ✔'];
+    const locked = !o;
+    const accent = locked ? '#8a92a5' : '#38d15e';
+    if (!this.pads.has('upgrade-upper')) this.pads.create('upgrade-upper', p.x, p.z, lines, accent, { withBar: true, locked, icon: '🪜' });
+    else this.pads.setLabel('upgrade-upper', lines, accent, locked);
+    this.pads.setActive('upgrade-upper', !locked);
+    this.pads.setProgress('upgrade-upper', o ? (this.state.padProgress['upgrade-upper'] ?? 0) / o.cost : 0);
+  }
+
+  private refreshParkingPad(): void {
+    const p = layout.pads.parking;
+    const lines = this.state.forklift ? ['PARKING', 'switch vehicle'] : ['PARKING', 'forklift bay'];
+    if (!this.pads.has('parking')) this.pads.create('parking', p.x, p.z, lines, '#7ec8ff', { icon: '🅿️', size: 2.4 });
+    else this.pads.setLabel('parking', lines, '#7ec8ff', false);
   }
 
   update(dt: number): void {
@@ -142,10 +189,19 @@ export class PayPads {
       this.sound.build();
     });
 
-    this.pay('upgrade-electric', dt, this.state.electric || this.timers.has('electric') ? Infinity : PP.electricPompwagen, () => {
-      this.timers.start('delivery', 'electric', 0, 'Electric pompwagen');
+    const veh = this.vehicleOffer();
+    this.pay('upgrade-electric', dt, veh.item ? veh.cost : Infinity, () => {
+      if (!veh.item) return;
+      this.timers.start('delivery', veh.item, 0, veh.item === 'electric' ? 'Electric pompwagen' : 'Forklift');
       this.refreshElectricPad();
-      this.bus.emit('toast', { text: 'Electric pompwagen ordered — the delivery truck is on its way', kind: 'good' });
+      this.bus.emit('toast', { text: `${veh.item === 'electric' ? 'Electric pompwagen' : 'Forklift'} ordered — the delivery truck is on its way`, kind: 'good' });
+    });
+
+    const up = this.upperOffer();
+    this.pay('upgrade-upper', dt, up ? up.cost : Infinity, () => {
+      if (!up) return;
+      this.timers.start('construction', 'upperLevel', up.row, `Rack level ${up.level + 1} · row ${rowLetter(up.row)}`);
+      this.refreshUpperPad();
     });
   }
 

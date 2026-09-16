@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import layout from '../config/layout.json';
-import { GameState, TOTAL_SLOTS } from '../core/GameState';
+import { GameState, TOTAL_SLOTS, slotCol, slotLevel, slotRow } from '../core/GameState';
 import { AABB } from './Warehouse';
 import { MergeBuilder, mat, unitBox } from './Merge';
 import { PALLET_TOP, palletWoodGeometry, palletWoodMaterial } from './Pallet';
@@ -10,20 +10,20 @@ import { textSprite } from './Textures';
 const R = layout.rackRows;
 const SECTIONS = Math.ceil(R.slotsPerRow / 2);
 export const ROW_LENGTH = R.slotsPerRow * R.slotSpacing + (SECTIONS - 1) * R.sectionGap;
-const BEAM_LEVELS = [1.75, 3.3];
-const UPRIGHT_H = 3.9;
+const BEAM_LEVELS = [1.75, 3.3, 4.85];
+const UPRIGHT_H = 5.4;
 const HALF_DEPTH = 0.46;
 
 export function rowLetter(row: number): string {
   return String.fromCharCode(65 + row);
 }
 
-export function slotPosition(index: number): { x: number; z: number } {
-  const row = Math.floor(index / R.slotsPerRow);
-  const col = index % R.slotsPerRow;
+export function slotPosition(index: number): { x: number; z: number; y: number } {
+  const row = slotRow(index);
+  const col = slotCol(index);
   const r = R.rows[row];
   const x = r.x - ROW_LENGTH / 2 + R.slotSpacing / 2 + col * R.slotSpacing + Math.floor(col / 2) * R.sectionGap;
-  return { x, z: r.z };
+  return { x, z: r.z, y: R.levelHeights[slotLevel(index)] };
 }
 
 /** z of the interaction strip in front (south side) of a row */
@@ -91,7 +91,7 @@ export class Racks {
     const frameXs: number[] = [x0 - 0.05];
     for (let s = 1; s < SECTIONS; s++) frameXs.push(x0 + s * (sectionW + R.sectionGap) - R.sectionGap / 2);
     frameXs.push(x0 + ROW_LENGTH + 0.05);
-    const braceH = [0.3, 1.3, 2.3, 3.3];
+    const braceH = [0.3, 1.3, 2.3, 3.3, 4.3];
     const diag = Math.atan2(HALF_DEPTH * 2 - 0.1, 1.0);
     const diagLen = Math.hypot(1.0, HALF_DEPTH * 2 - 0.1);
     for (const fx of frameXs) {
@@ -142,18 +142,19 @@ export class Racks {
     this.loads.begin();
     this.tags.begin();
     for (let i = 0; i < TOTAL_SLOTS; i++) {
-      const row = Math.floor(i / R.slotsPerRow);
-      if (row >= this.state.rackRows) continue;
+      const row = slotRow(i);
+      if (!this.state.slotUnlocked(i)) continue;
       const rs = this.rowGroups[row].scale.y;
       const pos = slotPosition(i);
       const pid = this.state.slots[i];
+      const level = slotLevel(i);
 
-      this.m.compose(this.v.set(pos.x, BEAM_LEVELS[0] * rs, pos.z + HALF_DEPTH + 0.05), this.tagQ, this.s.set(1, rs, 1));
+      this.m.compose(this.v.set(pos.x, BEAM_LEVELS[level] * rs, pos.z + HALF_DEPTH + 0.05), this.tagQ, this.s.set(1, rs, 1));
       this.tags.push(pid, this.m);
       if (!pid) continue;
 
       const bounce = 1 + Math.sin(this.slotAnim[i] * Math.PI) * 0.12;
-      this.m.compose(this.v.set(pos.x, 0, pos.z), this.q.identity(), this.s.set(bounce, (2 - bounce) * rs, bounce));
+      this.m.compose(this.v.set(pos.x, pos.y * rs, pos.z), this.q.identity(), this.s.set(bounce, (2 - bounce) * rs, bounce));
       this.wood.setMatrixAt(woodCount++, this.m);
       this.loads.push(pid, this.m);
     }
@@ -166,6 +167,11 @@ export class Racks {
 
   animateStore(index: number): void {
     this.slotAnim[index] = 1;
+    this.syncFromState();
+  }
+
+  /** an upper level was unlocked: refresh tags/pallets */
+  refresh(): void {
     this.syncFromState();
   }
 
@@ -183,13 +189,18 @@ export class Racks {
   private updateLabels(): void {
     for (let row = 0; row < this.state.rackRows; row++) {
       let count = 0;
-      for (let c = 0; c < R.slotsPerRow; c++) if (this.state.slots[row * R.slotsPerRow + c]) count++;
-      const text = `ROW ${rowLetter(row)} · ${count}/${R.slotsPerRow}`;
+      let cap = 0;
+      for (let i = 0; i < TOTAL_SLOTS; i++) {
+        if (slotRow(i) !== row || !this.state.slotUnlocked(i)) continue;
+        cap++;
+        if (this.state.slots[i]) count++;
+      }
+      const text = `ROW ${rowLetter(row)} · ${count}/${cap}`;
       if (text === this.labelText[row]) continue;
       this.labelText[row] = text;
       const m = this.labels[row].material as THREE.MeshBasicMaterial;
       m.map?.dispose();
-      m.map = textSprite(text, count >= R.slotsPerRow ? '#b8452c' : '#23427c', '#ffffff', 384, 96, 52);
+      m.map = textSprite(text, count >= cap ? '#b8452c' : '#23427c', '#ffffff', 384, 96, 52);
       m.needsUpdate = true;
     }
   }

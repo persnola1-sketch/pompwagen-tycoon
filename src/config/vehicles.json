@@ -20,5 +20,16 @@
     "loadedTurnFactor": 0.84,
     "handleLength": 1.05,
     "bodyLength": 1.6
+  },
+  "forklift": {
+    "maxSpeed": 5.2,
+    "accel": 6.5,
+    "brake": 9.0,
+    "turnSpeed": 2.4,
+    "capacity": 1,
+    "loadedSpeedFactor": 0.9,
+    "loadedTurnFactor": 0.85,
+    "wheelbase": 1.5,
+    "liftSpeed": 2.2
   }
 }

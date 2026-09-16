@@ -1,9 +1,20 @@
 {
-  "warehouse": { "width": 36, "depth": 26, "wallHeight": 6.5, "southWallHeight": 1.1, "roofHeight": 7.6 },
+  "warehouse": {
+    "width": 36,
+    "depth": 26,
+    "wallHeight": 6.5,
+    "southWallHeight": 1.1,
+    "roofHeight": 7.6
+  },
   "docks": {
-    "inboundX": -18, "outboundX": 18,
-    "doorZ": [-5, 5],
-    "doorWidth": 3.4, "doorHeight": 4.2
+    "inboundX": -18,
+    "outboundX": 18,
+    "doorZ": [
+      -5,
+      5
+    ],
+    "doorWidth": 3.4,
+    "doorHeight": 4.2
   },
   "rackRows": {
     "startRows": 2,
@@ -13,49 +24,155 @@
     "padOffsetZ": 1.55,
     "stripHalfDepth": 0.8,
     "rows": [
-      { "x": -6, "z": -9.4 },
-      { "x": -6, "z": -5.8 },
-      { "x": 6, "z": -9.4 },
-      { "x": 6, "z": -5.8 },
-      { "x": -6, "z": -0.6 },
-      { "x": 6, "z": -0.6 },
-      { "x": -6, "z": 3.0 },
-      { "x": 6, "z": 3.0 }
+      {
+        "x": -6,
+        "z": -9.4
+      },
+      {
+        "x": -6,
+        "z": -5.8
+      },
+      {
+        "x": 6,
+        "z": -9.4
+      },
+      {
+        "x": 6,
+        "z": -5.8
+      },
+      {
+        "x": -6,
+        "z": -0.6
+      },
+      {
+        "x": 6,
+        "z": -0.6
+      },
+      {
+        "x": -6,
+        "z": 3.0
+      },
+      {
+        "x": 6,
+        "z": 3.0
+      }
+    ],
+    "levels": 3,
+    "levelHeights": [
+      0,
+      1.81,
+      3.36
     ]
   },
   "pads": {
-    "unload": { "x": -15.4, "z": -5 },
-    "load": { "x": 15.4, "z": -5 },
-    "office": { "x": 0, "z": 10.6 },
-    "upgradeSpeed": { "x": -6, "z": 10.6 },
-    "upgradeElectric": { "x": 6, "z": 10.6 },
-    "radius": 1.15
+    "unload": {
+      "x": -15.4,
+      "z": -5
+    },
+    "load": {
+      "x": 15.4,
+      "z": -5
+    },
+    "office": {
+      "x": 0,
+      "z": 10.6
+    },
+    "upgradeSpeed": {
+      "x": -6,
+      "z": 10.6
+    },
+    "upgradeElectric": {
+      "x": 6,
+      "z": 10.6
+    },
+    "radius": 1.15,
+    "parking": {
+      "x": 12.5,
+      "z": 9.6
+    },
+    "upgradeUpper": {
+      "x": -12.5,
+      "z": 9.6
+    }
   },
-  "playerStart": { "x": 0, "z": 7 },
-  "breakSpot": { "x": -4, "z": 10.2 },
+  "playerStart": {
+    "x": 0,
+    "z": 7
+  },
+  "breakSpot": {
+    "x": -4,
+    "z": 10.2
+  },
   "conveyors": {
     "length": 9,
-    "inbound": { "x": -10.5, "z": 7.4, "dir": 1 },
-    "outbound": { "x": 10.5, "z": 7.4, "dir": 1 }
-  },
-  "plot": {
-    "pad": { "x": 0, "z": 2 },
-    "playerStart": { "x": 0, "z": 9 },
-    "watchPoint": { "x": 0, "z": 19 },
-    "sign": { "x": 11, "z": 15.5 },
-    "container": { "x": -11, "z": 15 }
-  },
-  "yard": { "fenceX": 36, "fenceZ": 30, "gateHalfWidth": 5.5, "roadOffset": 8, "roadWidth": 9 },
-  "truck": {
     "inbound": {
-      "spawn": { "x": -28, "z": 50 },
-      "approach": { "x": -28, "z": 0 },
-      "exit": { "x": -28, "z": -50 }
+      "x": -10.5,
+      "z": 7.4,
+      "dir": 1
     },
     "outbound": {
-      "spawn": { "x": 28, "z": 50 },
-      "approach": { "x": 28, "z": 0 },
-      "exit": { "x": 28, "z": -50 }
+      "x": 10.5,
+      "z": 7.4,
+      "dir": 1
+    }
+  },
+  "plot": {
+    "pad": {
+      "x": 0,
+      "z": 2
+    },
+    "playerStart": {
+      "x": 0,
+      "z": 9
+    },
+    "watchPoint": {
+      "x": 0,
+      "z": 19
+    },
+    "sign": {
+      "x": 11,
+      "z": 15.5
+    },
+    "container": {
+      "x": -11,
+      "z": 15
+    }
+  },
+  "yard": {
+    "fenceX": 36,
+    "fenceZ": 30,
+    "gateHalfWidth": 5.5,
+    "roadOffset": 8,
+    "roadWidth": 9
+  },
+  "truck": {
+    "inbound": {
+      "spawn": {
+        "x": -28,
+        "z": 50
+      },
+      "approach": {
+        "x": -28,
+        "z": 0
+      },
+      "exit": {
+        "x": -28,
+        "z": -50
+      }
+    },
+    "outbound": {
+      "spawn": {
+        "x": 28,
+        "z": 50
+      },
+      "approach": {
+        "x": 28,
+        "z": 0
+      },
+      "exit": {
+        "x": 28,
+        "z": -50
+      }
     },
     "length": 13.2,
     "rearInsideDoor": 1.2,
@@ -67,5 +184,15 @@
     "driveSpeed": 11.0,
     "reverseSpeed": 3.2,
     "maxVisibleCargo": 16
+  },
+  "parkingSpots": {
+    "pompwagen": {
+      "x": 14.6,
+      "z": 11.4
+    },
+    "forklift": {
+      "x": 12.2,
+      "z": 12.0
+    }
   }
 }

@@ -66,7 +66,9 @@ export class Character {
   private idleT = Math.random() * 10;
   private celebrateT = 0;
   /** arms reach back (pulling a handle) or forward (carrying) */
-  armMode: 'pull' | 'carry' | 'idle' = 'pull';
+  armMode: 'pull' | 'carry' | 'idle' | 'drive' = 'pull';
+  /** seated pose (driving a forklift) */
+  sitting = false;
 
   constructor(look: CharacterLook = DEFAULT_LOOK) {
     this.build(look);
@@ -154,6 +156,21 @@ export class Character {
 
   /** drive the walk cycle; `speed` in m/s */
   animate(dt: number, speed: number): void {
+    if (this.sitting) {
+      this.idleT += dt;
+      for (const leg of this.legs) {
+        leg.hip.rotation.x = -1.45;
+        leg.knee.rotation.x = 1.35;
+        leg.hip.position.y = HIP_Y;
+      }
+      this.shoulders.forEach((sh, i) => {
+        sh.rotation.x = -0.95 + Math.sin(this.idleT * 2 + i) * 0.03;
+        this.elbows[i].rotation.x = -0.55;
+      });
+      this.upper.position.y = HIP_Y + Math.sin(this.idleT * 2) * 0.004;
+      this.upper.rotation.x = 0.05;
+      return;
+    }
     const moving = Math.min(1, speed / 2);
     const run = Math.min(1, Math.max(0, (speed - 3.4) / 2));
     this.walkT += speed * dt * 4.2;

@@ -7,6 +7,7 @@ import { Orders } from '../core/Orders';
 import { Pads } from '../world/Pads';
 import { Player } from '../world/Player';
 import { Racks, inRowStrip, slotPosition } from '../world/Racks';
+import { slotIndex } from '../core/GameState';
 import { FallenPallets } from '../world/workers/FallenPallets';
 
 const PER_ROW = layout.rackRows.slotsPerRow;
@@ -19,6 +20,8 @@ const PER_ROW = layout.rackRows.slotsPerRow;
 export class Interactions {
   onCargoChanged: (() => void) | null = null;
   onOffice: (() => void) | null = null;
+  onParking: (() => void) | null = null;
+  private parkingLatch = false;
 
   /** off while the warehouse is not built or during cutscenes */
   enabled = true;
@@ -48,6 +51,15 @@ export class Interactions {
       }
     } else {
       this.officeLatch = false;
+    }
+
+    if (this.pads.isOn('parking', px, pz)) {
+      if (!this.parkingLatch) {
+        this.parkingLatch = true;
+        this.onParking?.();
+      }
+    } else {
+      this.parkingLatch = false;
     }
 
     this.cooldown = Math.max(0, this.cooldown - dt);
@@ -116,16 +128,20 @@ export class Interactions {
     return this.orders.customerNeed(pid) - this.player.cargo.filter((c) => c === pid).length;
   }
 
+  /** nearest matching slot in a row; the forklift reaches unlocked upper levels, pompwagens only the floor */
   private nearestSlot(row: number, px: number, match: (slot: string | null) => boolean): number {
     let best = -1;
     let bestD = Infinity;
-    for (let c = 0; c < PER_ROW; c++) {
-      const i = row * PER_ROW + c;
-      if (!match(this.state.slots[i])) continue;
-      const d = Math.abs(slotPosition(i).x - px);
-      if (d < bestD) {
-        bestD = d;
-        best = i;
+    const levels = this.player.vehicle === 'forklift' ? 1 + this.state.upperLevels[row] : 1;
+    for (let lv = 0; lv < levels; lv++) {
+      for (let c = 0; c < PER_ROW; c++) {
+        const i = slotIndex(row, c, lv);
+        if (!match(this.state.slots[i])) continue;
+        const d = Math.abs(slotPosition(i).x - px) + lv * 0.4;
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
       }
     }
     return best;
@@ -139,6 +155,7 @@ export class Interactions {
     const pid = this.player.cargo[idx];
     this.state.setSlot(slot, pid);
     this.racks.animateStore(slot);
+    this.player.liftTo(slotPosition(slot).y);
     this.player.setCargo(this.player.cargo.filter((_, k) => k !== idx));
     this.sound.palletDown();
     this.bus.emit('palletStored', { slot, product: pid });
@@ -153,6 +170,7 @@ export class Interactions {
     const pid = this.state.slots[slot]!;
     this.state.setSlot(slot, null);
     this.racks.syncFromState();
+    this.player.liftTo(slotPosition(slot).y);
     this.player.setCargo([...this.player.cargo, pid]);
     this.sound.palletUp();
     this.bus.emit('palletPicked', { from: 'rack', product: pid });

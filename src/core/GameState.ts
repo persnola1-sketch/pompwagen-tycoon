@@ -4,7 +4,26 @@ import { EventBus } from './EventBus';
 import { PRODUCTS, ProductDef, unlockedProducts } from './Products';
 
 export const SAVE_VERSION = 3;
-export const TOTAL_SLOTS = layout.rackRows.rows.length * layout.rackRows.slotsPerRow;
+const R = layout.rackRows;
+export const PER_ROW = R.slotsPerRow;
+export const ROWS = R.rows.length;
+export const LEVELS = R.levels;
+/** slots on one level across all rows; upper levels come after in the slot array */
+export const ROW_SLOTS = ROWS * PER_ROW;
+export const TOTAL_SLOTS = ROW_SLOTS * LEVELS;
+
+export function slotLevel(i: number): number {
+  return Math.floor(i / ROW_SLOTS);
+}
+export function slotRow(i: number): number {
+  return Math.floor((i % ROW_SLOTS) / PER_ROW);
+}
+export function slotCol(i: number): number {
+  return i % PER_ROW;
+}
+export function slotIndex(row: number, col: number, level: number): number {
+  return level * ROW_SLOTS + row * PER_ROW + col;
+}
 
 export interface Stats {
   shipped: number;
@@ -42,6 +61,9 @@ export interface SaveData {
   /** false on a fresh game: the player starts on an empty plot */
   warehouseBuilt: boolean;
   forklift?: boolean;
+  vehicle?: string;
+  /** unlocked upper levels per rack row (0–2) */
+  upperLevels?: number[];
   padProgress: Record<string, number>;
   stats: Stats;
 }
@@ -59,22 +81,39 @@ export class GameState {
   tipsSeen: string[] = [];
   padProgress: Record<string, number> = {};
   forklift = false;
+  vehicle: 'pompwagen' | 'forklift' = 'pompwagen';
+  upperLevels: number[] = new Array(ROWS).fill(0);
   stats: Stats = { ...EMPTY_STATS };
 
   constructor(private bus: EventBus) {}
 
   get capacity(): number {
-    return this.rackRows * layout.rackRows.slotsPerRow;
+    let n = 0;
+    for (let r = 0; r < this.rackRows; r++) n += PER_ROW * (1 + this.upperLevels[r]);
+    return n;
+  }
+
+  /** a slot in a built row on an unlocked level */
+  slotUnlocked(i: number): boolean {
+    const row = slotRow(i);
+    return row < this.rackRows && slotLevel(i) <= this.upperLevels[row];
   }
 
   /** pallets in built racks, optionally of one product */
   stockOf(productId?: string): number {
     let n = 0;
-    for (let i = 0; i < this.capacity; i++) {
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
       const s = this.slots[i];
-      if (s && (!productId || s === productId)) n++;
+      if (s && (!productId || s === productId) && this.slotUnlocked(i)) n++;
     }
     return n;
+  }
+
+  /** highest number of levels unlocked in any row (1–3) */
+  get maxLevels(): number {
+    let m = 1;
+    for (let r = 0; r < this.rackRows; r++) m = Math.max(m, 1 + this.upperLevels[r]);
+    return m;
   }
 
   get stock(): number {
@@ -86,7 +125,7 @@ export class GameState {
   }
 
   get stageIndex(): number {
-    return this.electric ? 1 : 0;
+    return this.forklift ? 2 : this.electric ? 1 : 0;
   }
 
   get unlocked(): ProductDef[] {
@@ -134,6 +173,8 @@ export class GameState {
       tutorialDone: this.tutorialDone,
       warehouseBuilt: this.warehouseBuilt,
       forklift: this.forklift,
+      vehicle: this.vehicle,
+      upperLevels: [...this.upperLevels],
       settings: { ...this.settings },
       tipsSeen: [...this.tipsSeen],
       padProgress: { ...this.padProgress },
@@ -156,5 +197,7 @@ export class GameState {
     this.padProgress = d.padProgress ?? {};
     this.stats = { ...EMPTY_STATS, ...(d.stats ?? {}) };
     this.forklift = d.forklift ?? false;
+    this.vehicle = d.vehicle === 'forklift' && this.forklift ? 'forklift' : 'pompwagen';
+    this.upperLevels = new Array(ROWS).fill(0).map((_, i) => Math.min(LEVELS - 1, d.upperLevels?.[i] ?? 0));
   }
 }

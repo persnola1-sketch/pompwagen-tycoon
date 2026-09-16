@@ -75,7 +75,12 @@
         2600
       ],
       "speedBonusPerLevel": 0.12
-    }
+    },
+    "forklift": 2500,
+    "upperLevelCosts": [
+      500,
+      900
+    ]
   },
   "tutorial": {
     "product": "water"

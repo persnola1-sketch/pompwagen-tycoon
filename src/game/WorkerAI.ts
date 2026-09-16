@@ -9,12 +9,10 @@ import { NavGrid } from '../core/Pathfinding';
 import { Workers } from '../core/workers/Workers';
 import { Worker, WorkerStatus, speedMultiplier, traitDef } from '../core/workers/WorkerTypes';
 import { Racks, rowPadZ, slotPosition } from '../world/Racks';
+import { TOTAL_SLOTS, slotLevel, slotRow } from '../core/GameState';
 import { resolveCircle } from '../world/Pompwagen';
 import { WorkerActor } from '../world/workers/WorkerActor';
 import { FallenPallets } from '../world/workers/FallenPallets';
-
-const R = layout.rackRows;
-const PER_ROW = R.slotsPerRow;
 
 type Task =
   | { kind: 'idle' }
@@ -143,11 +141,16 @@ export class WorkerAI {
 
   // ---------- slots ----------
 
+  private canReach(a: Agent, i: number): boolean {
+    if (!this.state.slotUnlocked(i)) return false;
+    return slotLevel(i) === 0 || a.worker.role === 'forklift';
+  }
+
   private freeSlot(a: Agent): number {
     let best = -1;
     let bd = Infinity;
-    for (let i = 0; i < this.state.capacity; i++) {
-      if (this.state.slots[i] || this.reserved.has(i)) continue;
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
+      if (this.state.slots[i] || this.reserved.has(i) || !this.canReach(a, i)) continue;
       const d = dist(a, this.slotPoint(i));
       if (d < bd) {
         bd = d;
@@ -160,8 +163,8 @@ export class WorkerAI {
   private slotWith(a: Agent, product: string): number {
     let best = -1;
     let bd = Infinity;
-    for (let i = 0; i < this.state.capacity; i++) {
-      if (this.state.slots[i] !== product || this.reserved.has(i)) continue;
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
+      if (this.state.slots[i] !== product || this.reserved.has(i) || !this.canReach(a, i)) continue;
       const d = dist(a, this.slotPoint(i));
       if (d < bd) {
         bd = d;
@@ -173,7 +176,7 @@ export class WorkerAI {
 
   private slotPoint(slot: number): Point {
     const p = slotPosition(slot);
-    return { x: p.x, z: rowPadZ(Math.floor(slot / PER_ROW)) };
+    return { x: p.x, z: rowPadZ(slotRow(slot)) };
   }
 
   /** pallets of a product the customer still needs beyond what agents already carry or are fetching */
@@ -282,7 +285,7 @@ export class WorkerAI {
           return;
         }
         a.cargo.push(pid);
-        a.actor.pompwagen.setCargo(a.cargo);
+        a.actor.setCargo(a.cargo);
         this.state.stats.unloaded++;
         this.bus.emit('workerAction', { workerId: w.id, action: 'unload', product: pid, x: a.x, z: a.z });
         if (a.cargo.length < cap && this.orders.activeSupplier?.state === 'docked') {
@@ -306,12 +309,13 @@ export class WorkerAI {
         } else if (!this.state.slots[slot]) {
           this.state.setSlot(slot, pid);
           this.racks.animateStore(slot);
+          a.actor.liftTo(slotPosition(slot).y);
           this.workers.addXp(w);
           this.bus.emit('workerAction', { workerId: w.id, action: 'store', product: pid, x: a.x, z: a.z });
         } else {
           a.cargo.push(pid); // someone took the slot: keep it and re-plan
         }
-        a.actor.pompwagen.setCargo(a.cargo);
+        a.actor.setCargo(a.cargo);
         a.task = { kind: 'idle' };
         break;
       }
@@ -322,8 +326,9 @@ export class WorkerAI {
         if (pid && a.cargo.length < cap) {
           this.state.setSlot(slot, null);
           this.racks.syncFromState();
+          a.actor.liftTo(slotPosition(slot).y);
           a.cargo.push(pid);
-          a.actor.pompwagen.setCargo(a.cargo);
+          a.actor.setCargo(a.cargo);
           this.bus.emit('workerAction', { workerId: w.id, action: 'pick', product: pid, x: a.x, z: a.z });
         }
         a.task = { kind: 'idle' };
@@ -341,7 +346,7 @@ export class WorkerAI {
           if (this.orders.tryLoadPallet(a.cargo[i])) {
             const pid = a.cargo[i];
             a.cargo.splice(i, 1);
-            a.actor.pompwagen.setCargo(a.cargo);
+            a.actor.setCargo(a.cargo);
             this.workers.addXp(w);
             this.bus.emit('workerAction', { workerId: w.id, action: 'load', product: pid, x: a.x, z: a.z });
             a.actionCooldown = 0.5;

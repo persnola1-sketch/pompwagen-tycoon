@@ -8,6 +8,7 @@ import { Workers } from '../core/workers/Workers';
 import { Effects } from '../world/Effects';
 import { Player } from '../world/Player';
 import { Pompwagen } from '../world/Pompwagen';
+import { Forklift } from '../world/Forklift';
 import { ROW_LENGTH, Racks, rowLetter, rowPadZ } from '../world/Racks';
 import { Truck } from '../world/Truck';
 import { ConstructionSite } from '../world/construction/ConstructionSite';
@@ -59,6 +60,12 @@ export class Construction {
       p.setElectric(true);
       p.follow(0.016, 0, 0, 0, 0, []);
       return p.group;
+    };
+    this.vehicleModels.forklift = (): THREE.Object3D => {
+      const f = new Forklift();
+      f.place(0.016, 0, 0, 0, 0, 0);
+      f.group.position.set(0, 0, 1.2);
+      return f.group;
     };
     // restore sites for jobs loaded from the save
     for (const j of timers.jobs) this.onStarted(j);
@@ -136,6 +143,15 @@ export class Construction {
         this.bus.emit('toast', { text: `Rack row ${rowLetter(row)} built! +${layout.rackRows.slotsPerRow} slots`, kind: 'good' });
         break;
       }
+      case 'upperLevel': {
+        const row = job.index;
+        this.state.upperLevels[row] = Math.min(layout.rackRows.levels - 1, this.state.upperLevels[row] + 1);
+        this.racks.refresh();
+        this.bus.emit('stockChanged', { stock: this.state.stock, capacity: this.state.capacity });
+        this.bus.emit('upgradeBought', { upgrade: 'upperLevel' });
+        this.bus.emit('toast', { text: `Rack row ${rowLetter(row)} now has ${1 + this.state.upperLevels[row]} levels! Forklift only`, kind: 'good' });
+        break;
+      }
       case 'electric':
         this.state.electric = true;
         this.player.setElectric(true);
@@ -144,6 +160,7 @@ export class Construction {
         break;
       case 'forklift':
         this.state.forklift = true;
+        this.player.setForkliftOwned(true);
         this.bus.emit('upgradeBought', { upgrade: 'forklift' });
         this.bus.emit('toast', { text: 'Forklift delivered! Switch vehicles at the parking pad', kind: 'good' });
         break;

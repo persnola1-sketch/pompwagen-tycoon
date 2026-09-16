@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Worker, WorkerStatus } from '../../core/workers/WorkerTypes';
 import { Character } from '../Character';
 import { Pompwagen } from '../Pompwagen';
+import { Forklift } from '../Forklift';
 import { AABB } from '../../core/Geometry';
 import { canvas } from '../Textures';
 
@@ -47,6 +48,7 @@ export class WorkerActor {
   readonly group = new THREE.Group();
   readonly character: Character;
   readonly pompwagen: Pompwagen;
+  readonly forklift: Forklift | null = null;
   private bubble: THREE.Sprite;
   private status: WorkerStatus = 'idle';
   private popT = 0;
@@ -67,7 +69,18 @@ export class WorkerActor {
     this.bubble = new THREE.Sprite(statusMaterial('💤'));
     this.bubble.scale.setScalar(0.7);
     this.bubble.renderOrder = 15;
-    this.group.add(this.character.group, this.pompwagen.group, this.bubble);
+    this.group.add(this.bubble);
+    if (worker.role === 'forklift') {
+      this.forklift = new Forklift(0xe8562a);
+      this.character.sitting = true;
+      this.character.armMode = 'drive';
+      this.character.group.position.copy(this.forklift.seat);
+      this.character.group.scale.setScalar(0.9);
+      this.forklift.group.add(this.character.group);
+      this.group.add(this.forklift.group);
+    } else {
+      this.group.add(this.character.group, this.pompwagen.group);
+    }
   }
 
   setStatus(s: WorkerStatus): void {
@@ -80,12 +93,26 @@ export class WorkerActor {
   }
 
   /** place the actor and animate the rig */
+  setCargo(products: string[]): void {
+    if (this.forklift) this.forklift.setCargo(products);
+    else this.pompwagen.setCargo(products);
+  }
+
+  liftTo(height: number): void {
+    if (this.forklift && height > 0.01) this.forklift.liftTo(height);
+  }
+
   update(dt: number, x: number, z: number, heading: number, speed: number, colliders: AABB[], electric: boolean): void {
-    this.character.group.position.set(x, 0, z);
-    this.character.group.rotation.y = heading;
-    this.character.animate(dt, speed);
-    this.pompwagen.setElectric(electric);
-    this.pompwagen.follow(dt, x, z, heading, speed, colliders);
+    if (this.forklift) {
+      this.forklift.place(dt, x, z, heading, 0, speed);
+      this.character.animate(dt, 0);
+    } else {
+      this.character.group.position.set(x, 0, z);
+      this.character.group.rotation.y = heading;
+      this.character.animate(dt, speed);
+      this.pompwagen.setElectric(electric);
+      this.pompwagen.follow(dt, x, z, heading, speed, colliders);
+    }
     if (this.popT > 0) this.popT = Math.max(0, this.popT - dt * 3);
     const s = 0.7 * (1 + Math.sin(this.popT * Math.PI) * 0.35);
     this.bubble.scale.setScalar(s);

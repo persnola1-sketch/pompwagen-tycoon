@@ -112,6 +112,8 @@ class Game {
 
     this.player = new Player(scene);
     this.player.setElectric(this.state.electric);
+    this.player.setForkliftOwned(this.state.forklift);
+    if (this.state.vehicle === 'forklift') this.player.setVehicle('forklift');
     this.player.speedBonus = this.state.speedLevel * economy.payPads.speedUpgrade.speedBonusPerLevel;
 
     this.effects = new Effects(scene);
@@ -157,6 +159,7 @@ class Game {
       this.board.toggle();
       this.sound.click();
     };
+    this.interactions.onParking = (): void => this.cycleVehicle();
     this.payPads = new PayPads(this.state, this.bus, this.pads, this.player, this.effects, this.sound, this.save, this.timers);
     this.payPads.onWarehouseBought = (): void => this.startConstruction();
     this.construction = new Construction(scene, this.state, this.bus, this.timers, this.racks, this.workers, this.player, this.effects);
@@ -230,8 +233,31 @@ class Game {
       jobs: this.timers.jobs.map((j) => `${j.item}:${Math.ceil(j.left)}`),
       rows: this.state.rackRows,
       electric: this.state.electric,
+      forklift: this.state.forklift,
+      vehicle: this.player.vehicle,
+      upper: this.state.upperLevels.slice(0, this.state.rackRows),
+      capacity: this.state.capacity,
       calls: this.root.renderer.info.render.calls,
     };
+  }
+
+  /** parking pad: hop between the pompwagen and the forklift */
+  private cycleVehicle(): void {
+    if (!this.state.forklift) {
+      this.bus.emit('toast', { text: 'Buy the forklift first — it parks here.', kind: 'info' });
+      return;
+    }
+    if (this.player.carrying > 0) {
+      this.bus.emit('toast', { text: 'Drop your pallets before switching vehicles.', kind: 'bad' });
+      return;
+    }
+    const next = this.player.vehicle === 'forklift' ? 'pompwagen' : 'forklift';
+    this.player.setVehicle(next);
+    this.state.vehicle = next;
+    this.sound.click();
+    this.bus.emit('toast', { text: next === 'forklift' ? '🚜 Forklift! Upper rack levels are yours.' : '🛒 Back on the pompwagen.', kind: 'good' });
+    if (next === 'forklift') this.tutorial.tip('firstForklift');
+    this.save.save();
   }
 
   // ---------- plot → warehouse ----------
