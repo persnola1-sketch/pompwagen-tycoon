@@ -70,6 +70,10 @@ export class Orders {
   /** office clerk auto-decisions (null = no clerk) */
   clerk: ClerkRules | null = null;
   clerkDelay = 2.5;
+  /** random-event multipliers (1 = normal) */
+  intervalFactor = 1;
+  priceFactor = 1;
+  supplierPriceFactor = 1;
   private clerkTimerS = 0;
   private clerkTimerC = 0;
 
@@ -172,7 +176,7 @@ export class Orders {
     // restock what is running low, weighted by demand
     const prod = weighted(this.state.unlocked, (p) => p.demand / (1 + this.state.stockOf(p.id))) ?? PRODUCTS[0];
     let pallets = randInt(s.supplierMin, s.supplierMax);
-    let price = Math.round(rand(prod.buyMin, prod.buyMax));
+    let price = Math.max(1, Math.round(rand(prod.buyMin, prod.buyMax) * this.supplierPriceFactor));
     pallets = Math.min(pallets, Math.max(1, this.state.freeSpace));
     const afford = Math.floor(this.state.money / Math.max(1, price));
     if (afford >= 1) pallets = Math.min(pallets, afford);
@@ -213,7 +217,7 @@ export class Orders {
       if (second) picks.push(second);
     }
     const sizes = picks.length > 1 ? [Math.ceil(total / 2), Math.floor(total / 2)] : [total];
-    const repBonus = 1 + this.state.reputation * economy.reputation.priceBonusPerStar;
+    const repBonus = (1 + this.state.reputation * economy.reputation.priceBonusPerStar) * this.priceFactor;
     const lines = picks
       .map((p, i) => ({
         product: p.id,
@@ -268,10 +272,10 @@ export class Orders {
   }
 
   private resetSupplierTimer(): void {
-    this.supplierTimer = rand(economy.supplier.offerIntervalMin, economy.supplier.offerIntervalMax);
+    this.supplierTimer = rand(economy.supplier.offerIntervalMin, economy.supplier.offerIntervalMax) * this.intervalFactor;
   }
   private resetCustomerTimer(): void {
-    this.customerTimer = rand(economy.customer.offerIntervalMin, economy.customer.offerIntervalMax);
+    this.customerTimer = rand(economy.customer.offerIntervalMin, economy.customer.offerIntervalMax) * this.intervalFactor;
   }
 
   // ---------- accept / decline ----------
@@ -420,7 +424,7 @@ export class Orders {
     const { revenue, profit } = this.settle(o);
     this.state.stats.ordersOnTime++;
     if (fast) this.state.addReputation(economy.customer.fastDeliveryRepBonus);
-    this.bus.emit('orderShipped', { orderId: o.id, revenue, profit, fast });
+    this.bus.emit('orderShipped', { orderId: o.id, store: o.store, revenue, profit, fast });
     this.bus.emit('truckLeaving', { kind: 'customer', orderId: o.id });
   }
 

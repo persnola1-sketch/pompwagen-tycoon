@@ -15,10 +15,10 @@
 /* ---------- HUD ---------- */
 #hud {
   top: calc(var(--safe-top) + 8px);
-  left: calc(var(--safe-left) + 10px); right: calc(var(--safe-right) + 10px);
-  display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap;
+  left: calc(var(--safe-left) + 10px); right: calc(var(--safe-right) + 64px);
   pointer-events: none;
 }
+#hud .chips { display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap; }
 .chip {
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 12px; padding: 7px 10px; font-weight: 700; font-size: 15px;
@@ -31,12 +31,17 @@
 @keyframes bump { 50% { transform: scale(1.18); } }
 #rep-chip { color: #ffd75e; font-size: 12px; }
 #stock-chip { color: #7ec8ff; }
-.hud-btns { margin-left: auto; display: flex; gap: 6px; }
+.hud-btns {
+  position: fixed; z-index: 55;
+  top: calc(var(--safe-top) + 8px); right: calc(var(--safe-right) + 10px);
+  display: flex; flex-direction: column; gap: 6px;
+}
 .hud-btns button {
   pointer-events: auto;
   background: var(--panel); border: 1px solid var(--panel-border);
-  color: #e8eaf0; border-radius: 12px; padding: 7px 11px; font-weight: 700; font-size: 14px;
-  min-height: 36px;
+  color: #e8eaf0; border-radius: 13px; padding: 0; font-weight: 700; font-size: 19px;
+  width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
 }
 #overview-toggle.on { background: var(--accent); color: #1b2230; }
 .hud-btns button { position: relative; }
@@ -52,11 +57,11 @@
   background: rgba(255,255,255,0.1); border: none; color: #e8eaf0; border-radius: 10px;
   width: 32px; height: 32px; font-size: 14px; font-weight: 800;
 }
-body.overview #cards, body.overview #tutorial { opacity: 0.35; }
+body.overview #cards, body.overview #guide { opacity: 0.35; }
 
 /* ---------- order board ---------- */
 #order-board {
-  top: calc(var(--safe-top) + 54px); right: calc(var(--safe-right) + 10px); width: min(240px, calc(100vw - 20px));
+  top: calc(var(--safe-top) + 100px); right: calc(var(--safe-right) + 64px); width: min(240px, calc(100vw - 80px));
   max-height: min(46dvh, calc(100dvh - var(--safe-top) - var(--safe-bottom) - 140px)); overflow-y: auto;
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 14px; padding: 10px; font-size: 13px;
@@ -78,9 +83,9 @@ body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 
 /* ---------- offer cards ---------- */
 #cards {
-  left: 50%; transform: translateX(-50%);
-  top: calc(var(--safe-top) + 52px);
-  width: min(340px, calc(100vw - 24px));
+  left: calc(var(--safe-left) + 10px); right: calc(var(--safe-right) + 64px);
+  top: calc(var(--safe-top) + 100px);
+  max-width: 380px; margin: 0 auto;
   display: flex; flex-direction: column; gap: 10px;
   pointer-events: none;
 }
@@ -204,10 +209,10 @@ body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 
 /* ---------- dev panel ---------- */
 #dev-panel {
-  top: calc(var(--safe-top) + 100px); left: 10px;
-  background: rgba(0,0,0,0.6); border-radius: 10px; padding: 6px 10px;
-  font-size: 11px; font-family: monospace; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  max-width: calc(100vw - 20px);
+  bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,0.72); border-radius: 10px; padding: 6px 10px;
+  font-size: 10px; font-family: monospace; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  justify-content: center; z-index: 95;
 }
 #dev-panel button { background: #333; color: #fff; border: none; border-radius: 6px; padding: 4px 8px; font-size: 11px; }
 
@@ -298,10 +303,12 @@ body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 .modal .btns button { flex: 1; min-height: 46px; }
 
 /* ---------- timers hud ---------- */
-#timers-hud {
-  top: calc(var(--safe-top) + 100px); left: calc(var(--safe-left) + 10px);
-  display: flex; flex-direction: column; gap: 6px; pointer-events: none; width: 168px;
+#left-stack {
+  left: calc(var(--safe-left) + 10px); bottom: calc(var(--safe-bottom) + 20px);
+  display: flex; flex-direction: column; gap: 6px; width: 172px; pointer-events: none;
 }
+body.guiding #left-stack, body.overview #left-stack { opacity: 0; pointer-events: none; }
+#timers-hud { position: static; display: flex; flex-direction: column; gap: 6px; }
 .timer-chip {
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
   padding: 6px 8px; font-size: 12px; pointer-events: auto; animation: toastIn 0.3s;
@@ -320,3 +327,59 @@ body.overview #cards, body.overview #tutorial { opacity: 0.35; }
 .ad-reason { margin: 12px 0 4px; font-weight: 700; }
 .ad-count { font-size: 56px; font-weight: 900; color: var(--accent); }
 .modal button.ghost { background: transparent; color: #aeb5c2; margin-top: 10px; }
+
+/* ---------- quests ---------- */
+.level-bar { display: flex; align-items: center; gap: 8px; padding: 0 12px 8px; }
+.level-bar .lv {
+  background: var(--accent); color: #1b2230; font-weight: 900; font-size: 12px;
+  border-radius: 10px; padding: 4px 9px; white-space: nowrap;
+}
+.level-bar .xp { position: relative; flex: 1; height: 16px; background: rgba(0,0,0,0.35); border-radius: 8px; overflow: hidden; }
+.level-bar .xp i { display: block; height: 100%; background: linear-gradient(90deg, #ffb020, #ffd75e); }
+.level-bar .xp span { position: absolute; inset: 0; font-size: 10px; font-weight: 800; text-align: center; line-height: 16px; }
+.qcard {
+  display: flex; gap: 10px; align-items: center;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--panel-border);
+  border-radius: 14px; padding: 10px; margin-bottom: 8px;
+}
+.qcard.ready { border-color: var(--good); box-shadow: 0 0 14px rgba(56,209,94,0.25); }
+.qcard.client { border-color: #b98cff; }
+.qinfo { flex: 1; min-width: 0; }
+.qtitle { font-weight: 800; font-size: 14px; }
+.qdesc { font-size: 12px; opacity: 0.75; margin-bottom: 5px; }
+.qtimer { font-size: 11px; color: #ffd75e; font-variant-numeric: tabular-nums; }
+.qbar { position: relative; height: 15px; background: rgba(0,0,0,0.35); border-radius: 8px; overflow: hidden; }
+.qbar i { display: block; height: 100%; background: linear-gradient(90deg, #2f9e4f, #38d15e); }
+.qbar span { position: absolute; inset: 0; font-size: 10px; font-weight: 800; text-align: center; line-height: 15px; }
+.qreward { display: inline-block; margin-top: 5px; font-size: 11px; font-weight: 800; color: var(--accent); }
+.qcard button { flex-shrink: 0; min-width: 72px; }
+.qcard button.claimed { background: transparent; color: var(--good); font-size: 18px; }
+
+/* ---------- event banner ---------- */
+#event-banner {
+  left: calc(var(--safe-left) + 10px); right: calc(var(--safe-right) + 64px);
+  top: calc(var(--safe-top) + 52px); max-width: 380px; margin: 0 auto;
+  background: linear-gradient(135deg, #5b2fb8, #b8342f);
+  border-radius: 14px; padding: 8px 12px; text-align: center;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  animation: cardIn 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+  pointer-events: none;
+}
+#event-banner .et { font-weight: 900; font-size: 15px; }
+#event-banner .ed { font-size: 12px; opacity: 0.9; }
+#event-banner .ec { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* ---------- tracked quest widget ---------- */
+#tracked-quest {
+  pointer-events: auto;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 12px; padding: 7px 9px; font-size: 11px; pointer-events: auto;
+}
+#tracked-quest[hidden] { display: none; }
+#tracked-quest .tq-title { font-weight: 800; font-size: 12px; }
+#tracked-quest .tq-bar { height: 5px; background: rgba(255,255,255,0.14); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+#tracked-quest .tq-bar i { display: block; height: 100%; background: var(--good); }
+#tracked-quest.ready { border-color: var(--good); }
+#level-chip { color: #ffd75e; gap: 4px; }
+#level-chip .lvbar { display: block; width: 34px; height: 5px; background: rgba(255,255,255,0.18); border-radius: 3px; overflow: hidden; }
+#level-chip .lvbar b { display: block; height: 100%; width: 0; background: var(--accent); }

@@ -64,6 +64,7 @@ export class GuideBubble {
     this.shown = 0;
     this.tap = tapToContinue;
     this.el.hidden = false;
+    document.body.classList.add('guiding');
     this.el.classList.remove('pop');
     void this.el.offsetWidth;
     this.el.classList.add('pop');
@@ -75,6 +76,7 @@ export class GuideBubble {
 
   hide(): void {
     this.el.hidden = true;
+    document.body.classList.remove('guiding');
     this.full = '';
   }
 

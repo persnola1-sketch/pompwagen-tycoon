@@ -1,0 +1,90 @@
+{
+  "companyLevelXp": [0, 120, 300, 560, 900, 1350, 1950, 2700, 3650, 4850, 6350, 8200, 10500, 13300, 16700, 20800, 25700, 31500, 38400, 46500],
+  "dailyCount": 3,
+  "claimBurstCoins": 12,
+  "story": [
+    { "id": "s1", "title": "First hire", "desc": "Hire your first worker", "metric": "workers", "target": 1, "money": 150, "xp": 40 },
+    { "id": "s2", "title": "Moving stock", "desc": "Ship 20 pallets to customers", "metric": "shipped", "target": 20, "money": 250, "xp": 60 },
+    { "id": "s3", "title": "New shelf space", "desc": "Build a third rack row", "metric": "rackRows", "target": 3, "money": 300, "xp": 80 },
+    { "id": "s4", "title": "Snack time", "desc": "Unlock a third product", "metric": "productsUnlocked", "target": 3, "money": 200, "xp": 70 },
+    { "id": "s5", "title": "A real team", "desc": "Have 2 workers on the payroll", "metric": "workers", "target": 2, "money": 400, "xp": 110, "rep": 0.2 },
+    { "id": "s6", "title": "Reliable partner", "desc": "Complete 10 customer orders", "metric": "ordersDone", "target": 10, "money": 450, "xp": 130 },
+    { "id": "s7", "title": "Plug it in", "desc": "Get the electric pompwagen", "metric": "electric", "target": 1, "money": 600, "xp": 180 },
+    { "id": "s8", "title": "Third pair of hands", "desc": "Have 3 workers on the payroll", "metric": "workers", "target": 3, "money": 800, "xp": 220 },
+    { "id": "s9", "title": "Hundred club", "desc": "Ship 100 pallets", "metric": "shipped", "target": 100, "money": 1200, "xp": 300, "rep": 0.3 },
+    { "id": "s10", "title": "Heftruck!", "desc": "Buy the forklift", "metric": "forklift", "target": 1, "money": 1500, "xp": 400 },
+    { "id": "s11", "title": "Let the belt walk", "desc": "Build your first conveyor", "metric": "conveyors", "target": 1, "money": 1800, "xp": 500 },
+    { "id": "s12", "title": "Going up", "desc": "Unlock an upper rack level", "metric": "upperLevels", "target": 1, "money": 2000, "xp": 550 },
+    { "id": "s13", "title": "Distribution centre", "desc": "Complete 50 customer orders", "metric": "ordersDone", "target": 50, "money": 3000, "xp": 800, "rep": 0.5 }
+  ],
+  "daily": [
+    { "id": "d_unload", "title": "Busy dock", "desc": "Unload {target} pallets", "metric": "unloaded", "min": 20, "max": 40, "money": 300, "xp": 60 },
+    { "id": "d_orders", "title": "On schedule", "desc": "Complete {target} orders on time", "metric": "onTime", "min": 4, "max": 8, "money": 400, "xp": 80 },
+    { "id": "d_earn", "title": "Good day at the office", "desc": "Earn €{target}", "metric": "earned", "min": 1500, "max": 3000, "money": 350, "xp": 70 },
+    { "id": "d_level", "title": "Growing the team", "desc": "Level up {target} worker(s)", "metric": "workerLevelUps", "min": 1, "max": 3, "money": 450, "xp": 90 },
+    { "id": "d_ship", "title": "Keep them rolling", "desc": "Ship {target} pallets", "metric": "shipped", "min": 25, "max": 50, "money": 380, "xp": 75 },
+    { "id": "d_clients", "title": "Popular warehouse", "desc": "Serve {target} different clients", "metric": "clientsServed", "min": 3, "max": 5, "money": 420, "xp": 85 },
+    { "id": "d_store", "title": "Full shelves", "desc": "Store {target} pallets in the racks", "metric": "stored", "min": 20, "max": 40, "money": 320, "xp": 65 }
+  ],
+  "achievements": [
+    { "id": "a1", "title": "Pallet pusher", "desc": "Move 100 pallets", "metric": "palletsMoved", "target": 100, "money": 500, "xp": 120, "badge": "📦" },
+    { "id": "a2", "title": "Thousand hauls", "desc": "Move 1,000 pallets", "metric": "palletsMoved", "target": 1000, "money": 4000, "xp": 900, "badge": "🏆" },
+    { "id": "a3", "title": "Employer of the year", "desc": "Have 10 workers", "metric": "workers", "target": 10, "money": 5000, "xp": 1200, "badge": "👷" },
+    { "id": "a4", "title": "Five stars", "desc": "Reach a 5 star reputation", "metric": "reputation", "target": 5, "money": 2500, "xp": 700, "badge": "⭐" },
+    { "id": "a5", "title": "Full catalogue", "desc": "Unlock every product", "metric": "productsUnlocked", "target": 6, "money": 2000, "xp": 600, "badge": "🛒" },
+    { "id": "a6", "title": "Automated", "desc": "Run both conveyors", "metric": "conveyors", "target": 2, "money": 3000, "xp": 800, "badge": "⚙️" },
+    { "id": "a7", "title": "Millionaire in the making", "desc": "Earn €50,000 in total", "metric": "earned", "target": 50000, "money": 6000, "xp": 1500, "badge": "💰" },
+    { "id": "a8", "title": "High rise", "desc": "Unlock 6 upper rack levels", "metric": "upperLevels", "target": 6, "money": 4500, "xp": 1000, "badge": "🏗️" }
+  ],
+  "events": {
+    "firstDelaySeconds": 180,
+    "intervalMinSeconds": 150,
+    "intervalMaxSeconds": 300,
+    "minCompanyLevel": 2,
+    "types": [
+      {
+        "id": "rush",
+        "title": "Rush hour!",
+        "desc": "Orders are pouring in and paying {bonus}% more",
+        "emoji": "🔥",
+        "seconds": 90,
+        "intervalFactor": 0.5,
+        "priceFactor": 1.25,
+        "weight": 3
+      },
+      {
+        "id": "inspection",
+        "title": "Surprise inspection",
+        "desc": "Clean up the fallen pallets before the inspector leaves",
+        "emoji": "🧹",
+        "seconds": 75,
+        "pallets": 3,
+        "money": 600,
+        "rep": 0.3,
+        "weight": 2
+      },
+      {
+        "id": "vip",
+        "title": "VIP client",
+        "desc": "{store} needs {target} pallets of {product} — double pay!",
+        "emoji": "💎",
+        "seconds": 240,
+        "minPallets": 6,
+        "maxPallets": 14,
+        "priceFactor": 2,
+        "money": 900,
+        "xp": 200,
+        "weight": 2
+      },
+      {
+        "id": "late",
+        "title": "Late supplier",
+        "desc": "A truck broke down — the next delivery comes at a discount",
+        "emoji": "⏳",
+        "seconds": 120,
+        "supplierPriceFactor": 0.6,
+        "weight": 2
+      }
+    ]
+  }
+}

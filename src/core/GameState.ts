@@ -65,6 +65,8 @@ export interface SaveData {
   conveyorIn?: boolean;
   conveyorOut?: boolean;
   conveyorSpeedLevel?: number;
+  companyXp?: number;
+  companyLevel?: number;
   /** unlocked upper levels per rack row (0–2) */
   upperLevels?: number[];
   padProgress: Record<string, number>;
@@ -88,6 +90,8 @@ export class GameState {
   conveyorIn = false;
   conveyorOut = false;
   conveyorSpeedLevel = 0;
+  companyXp = 0;
+  companyLevel = 1;
   upperLevels: number[] = new Array(ROWS).fill(0);
   stats: Stats = { ...EMPTY_STATS };
 
@@ -183,6 +187,8 @@ export class GameState {
       conveyorIn: this.conveyorIn,
       conveyorOut: this.conveyorOut,
       conveyorSpeedLevel: this.conveyorSpeedLevel,
+      companyXp: this.companyXp,
+      companyLevel: this.companyLevel,
       upperLevels: [...this.upperLevels],
       settings: { ...this.settings },
       tipsSeen: [...this.tipsSeen],
@@ -209,6 +215,8 @@ export class GameState {
     this.conveyorIn = d.conveyorIn ?? false;
     this.conveyorOut = d.conveyorOut ?? false;
     this.conveyorSpeedLevel = d.conveyorSpeedLevel ?? 0;
+    this.companyXp = d.companyXp ?? 0;
+    this.companyLevel = Math.max(1, d.companyLevel ?? 1);
     this.vehicle = d.vehicle === 'forklift' && this.forklift ? 'forklift' : 'pompwagen';
     this.upperLevels = new Array(ROWS).fill(0).map((_, i) => Math.min(LEVELS - 1, d.upperLevels?.[i] ?? 0));
   }

@@ -20,7 +20,7 @@ export type GameEvents = {
   palletStored: { slot: number; product: string };
   palletLoaded: { remaining: number; product: string };
   deliveryComplete: { orderId: number };
-  orderShipped: { orderId: number; revenue: number; profit: number; fast: boolean };
+  orderShipped: { orderId: number; store: string; revenue: number; profit: number; fast: boolean };
   orderMissed: { orderId: number };
   productUnlocked: { product: string };
 
@@ -45,6 +45,12 @@ export type GameEvents = {
   conveyorLoaded: { kind: 'in' | 'out'; product: string };
   conveyorDelivered: { kind: 'in' | 'out'; product: string; x: number; z: number };
   conveyorRunning: { running: boolean };
+  questsChanged: Record<string, never>;
+  questClaimed: { title: string; money: number; xp: number };
+  companyXpChanged: { xp: number; level: number };
+  companyLevelUp: { level: number };
+  eventStarted: { id: string; title: string; desc: string; seconds: number };
+  eventEnded: { id: string; success: boolean };
   jobStarted: { job: Job };
   jobDone: { job: Job };
   deliveryDispatched: { job: Job };

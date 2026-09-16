@@ -1,4 +1,5 @@
 import { Job, Timers } from '../core/Timers';
+import { Hud } from './Hud';
 
 const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(Math.ceil(s % 60) % 60).padStart(2, '0')}`;
 
@@ -12,7 +13,7 @@ export class TimersHud {
     this.el = document.createElement('div');
     this.el.id = 'timers-hud';
     this.el.className = 'ui';
-    document.body.appendChild(this.el);
+    (Hud.leftStack ?? document.body).appendChild(this.el);
     this.el.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-a]');
       if (!b) return;

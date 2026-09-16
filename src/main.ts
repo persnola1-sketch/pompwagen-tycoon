@@ -45,6 +45,9 @@ import { Construction } from './game/Construction';
 import { TimersHud } from './ui/TimersHud';
 import { AdService } from './services/AdService';
 import { Conveyors } from './game/Conveyors';
+import { Quests } from './core/quests/Quests';
+import { Events } from './core/Events';
+import { QuestPanel } from './ui/QuestPanel';
 
 class Game {
   private bus = new EventBus();
@@ -53,9 +56,13 @@ class Game {
   private orders = new Orders(this.state, this.bus);
   private tutorial = new Tutorial(this.state, this.orders, this.bus);
   private workers = new Workers(this.state, this.bus);
+  private quests = new Quests(this.state, this.workers, this.bus);
+  private events = new Events(this.state, this.orders, this.quests, this.bus);
+  private questPanel: QuestPanel;
+  private eventBanner: HTMLElement | null = null;
   private timers = new Timers(this.bus);
   private construction: Construction;
-  private timersHud = new TimersHud(this.timers);
+  private timersHud!: TimersHud;
   private ads = new AdService();
   private workerAI: WorkerAI;
   private fallen: FallenPallets;
@@ -99,6 +106,8 @@ class Game {
   constructor() {
     this.save.register('workers', this.workers);
     this.save.register('timers', this.timers);
+    this.save.register('quests', this.quests);
+    this.save.register('events', this.events);
     this.save.load();
     this.tutorial.hasWorkers = true;
 
@@ -137,6 +146,10 @@ class Game {
     this.board.onCountChanged = (n): void => this.hud.setBoardCount(n);
     this.board.onClose = (): void => this.sound.click();
     this.dev = new DevPanel(this.state, this.save, this.root.renderer);
+    this.dev.onLevel = (): void => this.quests.addCompanyXp(this.quests.levelProgress().need);
+    this.dev.onFinishTimers = (): void => this.timers.finishAll();
+    this.dev.onEvent = (): void => this.events.trigger();
+    this.dev.onSkipTutorial = (): void => this.tutorial.skip();
     this.wireCamera();
 
     const p = layout.pads;
@@ -160,6 +173,21 @@ class Game {
       this.sound.click();
       this.workersPanel.toggle();
     };
+    this.timersHud = new TimersHud(this.timers);
+    this.questPanel = new QuestPanel(this.quests, this.state, this.bus);
+    this.questPanel.onClose = (): void => this.sound.click();
+    this.questPanel.onClaim = (q, btn): void => {
+      if (!this.quests.claim(q)) return;
+      const r = btn.getBoundingClientRect();
+      this.confetti.burst(50, r.top / window.innerHeight);
+      this.sound.chaChing();
+      this.save.save();
+    };
+    this.hud.onQuestsToggle = (): void => {
+      this.sound.click();
+      this.questPanel.toggle();
+    };
+    this.wireQuests();
     this.wireWorkers();
     this.interactions.onOffice = (): void => {
       this.board.toggle();
@@ -181,6 +209,10 @@ class Game {
       void this.ads.showRewarded(`finish ${job.label} now`).then((ok) => {
         if (ok) this.timers.finishNow(job.id);
         this.timersHud.render();
+      this.questPanel.tick();
+      this.questRefresh?.();
+      const ev = this.events.active;
+      if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
       });
     };
     this.timersHud.onFinishPay = (job): void => {
@@ -196,10 +228,18 @@ class Game {
     this.bus.on('jobStarted', ({ job }) => {
       if (job.kind === 'construction') this.tutorial.tip('firstConstruction');
       this.timersHud.render();
+      this.questPanel.tick();
+      this.questRefresh?.();
+      const ev = this.events.active;
+      if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
       this.save.save();
     });
     this.bus.on('jobDone', () => {
       this.timersHud.render();
+      this.questPanel.tick();
+      this.questRefresh?.();
+      const ev = this.events.active;
+      if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
       this.save.save();
     });
     this.wireEvents();
@@ -245,6 +285,11 @@ class Game {
       upper: this.state.upperLevels.slice(0, this.state.rackRows),
       capacity: this.state.capacity,
       belts: [this.state.conveyorIn, this.state.conveyorOut],
+      level: this.state.companyLevel,
+      xp: this.state.companyXp,
+      claimable: this.quests.claimable,
+      tracked: this.quests.tracked?.title ?? null,
+      event: this.events.active?.title ?? null,
       calls: this.root.renderer.info.render.calls,
     };
   }
@@ -317,6 +362,58 @@ class Game {
     if (this.state.tutorialDone) this.orders.startAuto();
     this.save.save();
   }
+
+  private wireQuests(): void {
+    this.quests.start();
+    const refresh = (): void => {
+      this.hud.setQuestCount(this.quests.claimable);
+      const { into, need } = this.quests.levelProgress();
+      this.hud.setLevel(this.state.companyLevel, into, need);
+      const t = this.quests.tracked;
+      this.hud.setTracked(t ? t.title : null, t ? this.quests.progress(t) : 0, t ? t.target : 1, !!t && this.quests.isDone(t));
+    };
+    refresh();
+    this.questRefresh = refresh;
+    this.bus.on('questsChanged', refresh);
+    this.bus.on('companyXpChanged', refresh);
+    this.bus.on('questClaimed', ({ title, money, xp }) => {
+      this.bus.emit('toast', { text: `🎯 ${title} — +€${money}, +${xp} XP`, kind: 'unlock' });
+    });
+    this.bus.on('companyLevelUp', ({ level }) => {
+      this.sound.fanfare();
+      this.confetti.burst(90, 0.4);
+      this.toasts.banner(`Company level ${level}!`, 'New shop items unlocked');
+      this.save.save();
+    });
+
+    // random events
+    this.events.onInspection = (n): void => {
+      for (let i = 0; i < n; i++) {
+        this.fallen.drop(this.state.unlocked[i % this.state.unlocked.length].id, (Math.random() - 0.5) * 18, -2 + Math.random() * 8);
+      }
+    };
+    this.events.fallenCount = (): number => this.fallen.count;
+    this.bus.on('eventStarted', ({ title, desc, seconds }) => {
+      this.sound.fanfare();
+      this.eventBanner?.remove();
+      const el = document.createElement('div');
+      el.id = 'event-banner';
+      el.className = 'ui';
+      el.innerHTML = `<div class="et"></div><div class="ed"></div><div class="ec"></div>`;
+      (el.querySelector('.et') as HTMLElement).textContent = title;
+      (el.querySelector('.ed') as HTMLElement).textContent = desc;
+      (el.querySelector('.ec') as HTMLElement).textContent = `${Math.ceil(seconds)}s`;
+      document.body.appendChild(el);
+      this.eventBanner = el;
+    });
+    this.bus.on('eventEnded', () => {
+      this.eventBanner?.remove();
+      this.eventBanner = null;
+      this.tutorial.tip('firstEvent');
+    });
+  }
+
+  private questRefresh: (() => void) | null = null;
 
   private wireWorkers(): void {
     this.bus.on('workerHired', ({ workerId }) => {
@@ -565,6 +662,8 @@ class Game {
       this.timers.update(dt);
       this.construction.update(dt, camera);
       this.conveyors.update(dt);
+      this.quests.update(dt);
+      this.events.update(dt);
     }
     if (this.state.warehouseBuilt && !this.build) {
       this.workers.update(dt, this.state.forklift);
@@ -598,6 +697,10 @@ class Game {
       this.board.tick();
       this.workersPanel.tick();
       this.timersHud.render();
+      this.questPanel.tick();
+      this.questRefresh?.();
+      const ev = this.events.active;
+      if (ev && this.eventBanner) (this.eventBanner.querySelector('.ec') as HTMLElement).textContent = `${Math.max(0, Math.ceil(ev.left))}s`;
     }
 
     this.saveTimer += dt;
