@@ -445,3 +445,6 @@ body.guiding #left-stack, body.overview #left-stack { opacity: 0; pointer-events
 .map-legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px 2px 0; font-size: 11px; }
 .map-legend span { display: flex; align-items: center; gap: 4px; }
 .map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.qclaim { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.qclaim button { min-width: 78px; min-height: 36px; font-size: 12px; }
+.wcard button.ad.small { min-height: 32px; font-size: 11px; padding: 4px 8px; margin-top: 4px; }

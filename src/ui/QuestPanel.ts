@@ -18,7 +18,7 @@ export class QuestPanel {
   private body: HTMLElement;
   private tab: QuestTab = 'story';
   onClose: (() => void) | null = null;
-  onClaim: ((q: Quest, el: HTMLElement) => void) | null = null;
+  onClaim: ((q: Quest, el: HTMLElement, doubled: boolean) => void) | null = null;
 
   constructor(private quests: Quests, private state: GameState, bus: EventBus) {
     this.el = document.createElement('div');
@@ -45,7 +45,7 @@ export class QuestPanel {
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-claim]');
       if (!btn) return;
       const q = this.quests.all.find((x) => x.defId === btn.dataset.claim);
-      if (q) this.onClaim?.(q, btn);
+      if (q) this.onClaim?.(q, btn, btn.dataset.double === '1');
     });
     bus.on('questsChanged', () => this.render());
     bus.on('companyXpChanged', () => this.renderLevel());
@@ -109,7 +109,7 @@ export class QuestPanel {
     const button = q.claimed
       ? `<button disabled class="claimed">✔</button>`
       : done
-        ? `<button class="primary" data-claim="${q.defId}">Claim</button>`
+        ? `<div class="qclaim"><button class="ad" data-claim="${q.defId}" data-double="1">📺 ×2</button><button class="primary" data-claim="${q.defId}">Claim</button></div>`
         : `<button disabled>${pct}%</button>`;
     return `<div class="qcard ${done && !q.claimed ? 'ready' : ''} ${q.tab === 'client' ? 'client' : ''}">
       <div class="qinfo">

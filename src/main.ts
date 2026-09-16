@@ -201,6 +201,19 @@ class Game {
       this.sound.click();
       this.save.save();
     };
+    this.workersPanel.onTempAd = (): void => {
+      void this.ads.showRewarded('a free temp worker').then((ok) => {
+        if (ok) this.workers.hireTemp(true);
+        this.workersPanel.render();
+      });
+    };
+    this.workersPanel.onTrainAd = (id): void => {
+      void this.ads.showRewarded('finishing the training now').then((ok) => {
+        const w = this.workers.byId(id);
+        if (ok && w) w.trainingLeft = 0.01;
+        this.workersPanel.render();
+      });
+    };
     this.hud.onWorkersToggle = (): void => {
       this.sound.click();
       this.workersPanel.toggle();
@@ -216,12 +229,16 @@ class Game {
     this.timersHud = new TimersHud(this.timers);
     this.questPanel = new QuestPanel(this.quests, this.state, this.bus);
     this.questPanel.onClose = (): void => this.sound.click();
-    this.questPanel.onClaim = (q, btn): void => {
-      if (!this.quests.claim(q)) return;
-      const r = btn.getBoundingClientRect();
-      this.confetti.burst(50, r.top / window.innerHeight);
-      this.sound.chaChing();
-      this.save.save();
+    this.questPanel.onClaim = (q, btn, doubled): void => {
+      const collect = (mult: number): void => {
+        if (!this.quests.claim(q, mult)) return;
+        const r = btn.getBoundingClientRect();
+        this.confetti.burst(mult > 1 ? 90 : 50, r.top / window.innerHeight);
+        this.sound.chaChing();
+        this.save.save();
+      };
+      if (!doubled) collect(1);
+      else void this.ads.showRewarded(`double the ${q.title} reward`).then((ok) => collect(ok ? 2 : 1));
     };
     this.hud.onQuestsToggle = (): void => {
       this.sound.click();
@@ -663,10 +680,12 @@ class Game {
       this.save.save();
     };
     this.shiftReport.onDouble = (r): void => {
-      // ad-based doubling arrives with the AdService (phase 12); for now just collect
-      this.state.addMoney(Math.max(0, r.earned - r.wages));
-      this.sound.chaChing();
-      this.save.save();
+      void this.ads.showRewarded('double the night shift earnings').then((ok) => {
+        if (ok) this.state.addMoney(Math.max(0, r.earned - r.wages));
+        this.confetti.burst(ok ? 70 : 30, 0.45);
+        this.sound.chaChing();
+        this.save.save();
+      });
     };
     this.shiftReport.show(report);
     this.bus.emit('workersChanged', {});

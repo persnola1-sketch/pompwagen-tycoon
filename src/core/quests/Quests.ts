@@ -185,13 +185,15 @@ export class Quests {
     return q;
   }
 
-  claim(q: Quest): boolean {
+  claim(q: Quest, multiplier = 1): boolean {
     if (q.claimed || !this.isDone(q)) return false;
     q.claimed = true;
-    this.state.addMoney(q.money);
-    this.addCompanyXp(q.xp);
+    const money = Math.round(q.money * multiplier);
+    const xp = Math.round(q.xp * multiplier);
+    this.state.addMoney(money);
+    this.addCompanyXp(xp);
     if (q.rep) this.state.addReputation(q.rep);
-    this.bus.emit('questClaimed', { title: q.title, money: q.money, xp: q.xp });
+    this.bus.emit('questClaimed', { title: q.title, money, xp });
     if (q.tab === 'story') {
       this.storyIndex++;
       this.story = [];

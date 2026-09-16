@@ -22,6 +22,7 @@ export class WorkersPanel {
   onClose: (() => void) | null = null;
   onAction: (() => void) | null = null;
   onTempAd: (() => void) | null = null;
+  onTrainAd: ((workerId: number) => void) | null = null;
 
   constructor(private workers: Workers, private state: GameState, bus: EventBus) {
     this.el = document.createElement('div');
@@ -103,6 +104,7 @@ export class WorkersPanel {
     else if (a === 'refresh') this.workers.refreshCandidates(this.state.forklift, true);
     else if (a === 'temp') this.workers.hireTemp();
     else if (a === 'tempAd') this.onTempAd?.();
+    else if (a === 'trainAd') this.onTrainAd?.(id);
     else if (a === 'fire' && confirm('Let this worker go?')) this.workers.fire(id);
     else if (a === 'shift') this.workers.setShift(id, b.dataset.shift as 'day' | 'night');
     this.onAction?.();
@@ -172,6 +174,7 @@ export class WorkersPanel {
     const pct = Math.min(100, Math.round((w.xp / need) * 100));
     const temp = w.tempLeft !== null;
     const training = w.role === 'forklift' ? `<span data-training="${w.id}">${w.trainingLeft > 0 ? `🎓 training ${Math.ceil(w.trainingLeft)}s` : '✔ certified'}</span>` : '';
+    const trainAd = w.trainingLeft > 0 ? `<button data-a="trainAd" data-id="${w.id}" class="ad small">📺 Finish training</button>` : '';
     return `<div class="wcard team">
       <div class="portrait">${portraitSvg(w.look, 52)}<div class="lvl">LV ${w.level}</div></div>
       <div class="info">
@@ -179,6 +182,7 @@ export class WorkersPanel {
         <div class="role">${role.emoji} ${role.name} · ${t.emoji} ${t.name} ${training}</div>
         <div class="xp"><i style="width:${pct}%"></i><span>${w.xp}/${need} XP</span></div>
         <div class="meta">📦 ${w.stats.moved} moved · ${w.stats.shifts} shifts · wage ${eur(w.wage)}${w.stats.drops ? ` · 💥 ${w.stats.drops} drops` : ''}${temp ? ` · leaves in ${Math.ceil((w.tempLeft ?? 0) / 60)} min` : ''}</div>
+        ${trainAd}
         ${temp ? '' : `<div class="shift-toggle">
           <button data-a="shift" data-id="${w.id}" data-shift="day" class="${w.shift === 'day' ? 'on' : ''}">☀️ Day</button>
           <button data-a="shift" data-id="${w.id}" data-shift="night" class="${w.shift === 'night' ? 'on' : ''}">🌙 Night</button>
