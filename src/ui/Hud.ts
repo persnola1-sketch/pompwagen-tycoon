@@ -26,7 +26,7 @@ export class Hud {
     hud.className = 'ui';
     hud.innerHTML =
       `<div class="chips">` +
-      `<div class="chip" id="money-chip">€<span>0</span></div>` +
+      `<div class="chip" id="money-chip"><i class="coin"></i><span>0</span></div>` +
       `<div class="chip" id="level-chip">LV <span>1</span><i class="lvbar"><b></b></i></div>` +
       `<div class="chip" id="rep-chip"></div>` +
       `<div class="chip" id="stock-chip">📦 <span>0/0</span></div>` +

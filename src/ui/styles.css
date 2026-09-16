@@ -3,14 +3,43 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
-  --panel: rgba(24, 30, 42, 0.92);
-  --panel-border: rgba(255, 255, 255, 0.12);
+
+  /* surfaces: dark navy, three levels */
+  --navy-900: #0f1520;
+  --navy-800: #161d2b;
+  --navy-700: #1e2637;
+  --panel: rgba(22, 29, 43, 0.94);
+  --panel-2: rgba(255, 255, 255, 0.055);
+  --panel-border: rgba(255, 255, 255, 0.11);
+
+  /* brand: warehouse orange + safety yellow */
   --accent: #ffb020;
+  --accent-2: #f2c018;
+  --accent-ink: #1b2230;
   --good: #38d15e;
   --bad: #f05555;
+  --info: #6fc3ff;
+  --text: #e8eaf0;
+  --text-dim: rgba(232, 234, 240, 0.66);
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 6px 22px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --tap: 44px;
+
+  --font-ui: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Baloo 2', 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.ui { position: fixed; z-index: 50; color: #e8eaf0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+.ui { position: fixed; z-index: 50; color: var(--text); font-family: var(--font-ui); }
+.ui button, .ui input { font-family: var(--font-ui); }
+.modal-title, .sheet-head .tabs button, #banner .big, #profit-splash .big, .qtitle, .wcard .name, .shop-card .name, .card .title {
+  font-family: var(--font-display); letter-spacing: 0.2px;
+}
 
 /* ---------- HUD ---------- */
 #hud {
@@ -23,7 +52,7 @@
   background: var(--panel); border: 1px solid var(--panel-border);
   border-radius: 12px; padding: 7px 10px; font-weight: 700; font-size: 15px;
   display: flex; align-items: center; gap: 5px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  box-shadow: var(--shadow-1);
   white-space: nowrap;
 }
 #money-chip { color: var(--accent); }
@@ -91,8 +120,8 @@ body.overview #cards, body.overview #guide { opacity: 0.35; }
 }
 .card {
   background: var(--panel); border: 1px solid var(--panel-border);
-  border-radius: 16px; padding: 12px 14px;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+  border-radius: var(--r-lg); padding: 13px 14px;
+  box-shadow: var(--shadow-2);
   pointer-events: auto;
   animation: cardIn 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
@@ -468,3 +497,46 @@ button:active:not(:disabled) { transform: scale(0.94); }
 .quality { display: flex; gap: 6px; }
 .quality button { flex: 1; background: #3a4457; min-height: 40px; font-size: 12px; }
 .quality button.on { background: var(--accent); color: #1b2230; }
+
+/* ---------- order cards (design pass) ---------- */
+.card .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.card .head .who { flex: 1; min-width: 0; }
+.card .title { font-weight: 800; font-size: 16px; line-height: 1.15; }
+.card .sub { font-size: 11.5px; color: var(--text-dim); }
+.card .contact { display: flex; flex-direction: column; align-items: center; gap: 1px; flex-shrink: 0; }
+.card .contact span { font-size: 9.5px; color: var(--text-dim); max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .ring { flex-shrink: 0; transform: rotate(-90deg); }
+.card .ring .track { fill: none; stroke: rgba(255,255,255,0.12); stroke-width: 4; }
+.card .ring .fill { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.25s linear; }
+.card .lines { background: rgba(0,0,0,0.22); border-radius: var(--r-md); padding: 6px 10px; margin-bottom: 8px; }
+.pline { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 13.5px; }
+.pline + .pline { border-top: 1px solid rgba(255,255,255,0.07); }
+.pcount { font-weight: 900; font-size: 15px; color: var(--accent); min-width: 28px; }
+.pprice { margin-left: auto; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.pline .stock { margin-left: 8px; font-variant-numeric: tabular-nums; font-size: 12px; }
+.card .summary { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 6px; }
+.card .summary b { font-variant-numeric: tabular-nums; font-size: 15px; }
+.card .checks { display: flex; gap: 10px; font-size: 11.5px; font-weight: 700; margin-bottom: 4px; }
+.card .btns { gap: 10px; margin-top: 10px; }
+.card button { min-height: var(--tap); border-radius: var(--r-md); font-size: 15px; }
+.card .accept { background: linear-gradient(180deg, #38d15e, #2a8a44); box-shadow: 0 3px 0 #1f6b34; }
+.card .accept:disabled { background: #3a4152; box-shadow: none; color: #8a92a5; }
+.card .decline { background: #3f475a; box-shadow: 0 3px 0 #2a3040; }
+
+/* ---------- landscape ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .sheet { width: min(520px, 100vw); max-height: calc(100dvh - 60px); }
+  #cards { right: calc(var(--safe-right) + 64px); max-width: 320px; top: calc(var(--safe-top) + 58px); }
+  #bottom-nav button { flex-direction: row; gap: 6px; min-height: 42px; }
+  #bottom-nav .nlabel { font-size: 11px; }
+  #guide { bottom: calc(var(--safe-bottom) + 62px); width: min(420px, calc(100vw - 260px)); }
+  #left-stack { bottom: calc(var(--safe-bottom) + 60px); }
+  #hud .chips { gap: 4px; }
+  .chip { padding: 5px 8px; font-size: 13px; }
+}
+#money-chip .coin {
+  width: 16px; height: 16px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+  background: radial-gradient(circle at 35% 30%, #ffe98a, #f2b418 62%, #c98a10);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.35);
+}
+#money-chip span { font-variant-numeric: tabular-nums; }

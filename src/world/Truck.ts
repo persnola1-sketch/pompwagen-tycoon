@@ -261,7 +261,7 @@ export class Truck {
     this.liveryMat.needsUpdate = true;
     const h = hash(name + this.kind);
     const letters = 'BDFGHJKLNPRSTVXZ';
-    const plate = `${letters[h % 16]}${letters[(h >> 4) % 16]}-${100 + (h % 900)}-${letters[(h >> 8) % 16]}`;
+    const plate = `${letters[h % 16]}${letters[(h >>> 4) % 16]}-${100 + (h % 900)}-${letters[(h >>> 8) % 16]}`;
     this.plateMat.map?.dispose();
     this.plateMat.map = plateTexture(plate);
     this.plateMat.needsUpdate = true;

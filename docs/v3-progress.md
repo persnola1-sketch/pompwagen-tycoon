@@ -17,7 +17,7 @@ Tracks what is built per phase of `docs/update-v3.md`, so a new session can cont
 | 11 Shop menu | done | `config/shop.json` + `game/Shop.ts` (prices, company-level gates, purchase effects), `ui/ShopPanel.ts` (5 tabs, cards with build/delivery times, lock states), `ui/BottomNav.ts` (Shop · Workers · Quests · Orders · Map with badges, one panel at a time), `ui/MapPanel.ts` live city map, cosmetics (company name/logo, vest, vehicle paint, wall colour) applied to the world
 | 12 Ad hooks | done | `services/AdService.ts` fake rewarded break; 📺 buttons for finish construction/delivery (`TimersHud`), finish training + free temp worker (`WorkersPanel`), double quest reward (`QuestPanel`), double night shift (`ShiftReport`), free rush boost and finish-all (shop Boosts). All optional, never forced
 | 13 Animations & effects | done | rolling dock doors, blinking truck indicators, money counter roll-up + coins flying to the HUD, `world/Ambience.ts` (dust motes, birds), idle phone check, forklift mast tilt, button press bounce, procedural background music with a toggle, `ui/SettingsPanel.ts` (sound, music, tips, graphics quality, reset)
-| 14 UI overhaul | todo | |
+| 14 UI overhaul | done | design tokens (navy surfaces, orange/yellow accents, radii, shadows, 44 px targets), Baloo 2 + Nunito from Google Fonts with fallbacks, order cards rebuilt (logo, contact portrait, product lines, stock checks, countdown ring, big buttons), coin icon on the money chip, landscape media query
 | 15 Balance, save, perf | todo | |
 
 ## Testing

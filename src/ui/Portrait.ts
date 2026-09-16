@@ -26,6 +26,30 @@ export function portraitSvg(look: WorkerLook, size = 48): string {
   </svg>`;
 }
 
+const SKINS = [0xf0c9a8, 0xe0ac85, 0xc98a5b, 0x8d5a3b, 0x6b4327, 0xf5d9bd];
+const HAIRS = [0x4a2f1c, 0x2b2118, 0x8a6a3a, 0xd9c08a, 0x9a9a9a, 0x5a3b2a];
+const SHIRTS = [0x2c3e66, 0x5a6b8a, 0x6b4d3a, 0x3d4b5e, 0x7a4b6b, 0x2f6f5a];
+
+/** a stable portrait for a named contact person (clients and suppliers) */
+export function contactPortrait(name: string, size = 40, accent = '#2f6fb4'): string {
+  let h = 0;
+  // unsigned shifts only: a signed shift on a large hash gives a negative index
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return portraitSvg(
+    {
+      skin: SKINS[h % SKINS.length],
+      hair: HAIRS[(h >>> 3) % HAIRS.length],
+      shirt: SHIRTS[(h >>> 6) % SHIRTS.length],
+      vest: parseInt(accent.slice(1), 16),
+      hat: 'none',
+      hatColor: 0xffffff,
+      height: 1,
+      mustache: ((h >>> 9) & 3) === 0,
+    },
+    size,
+  );
+}
+
 export function stars(n: number): string {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
